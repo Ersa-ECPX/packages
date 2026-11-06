@@ -20,10 +20,24 @@ root="$PWD"
 out="$(realpath -m "${1:-repo}")"
 work="${BUILD_DIR:-$(mktemp -d)}"
 
-zypper --non-interactive --gpg-auto-import-keys refresh
-zypper --non-interactive install --no-recommends rpm-build rpm-config-SUSE rpmdevtools createrepo_c \
+# download.opensuse.org sends each request to a mirror, and a mirror that is mid-sync can lack a metadata file the index
+# lists ("File ... not found on medium"). That is transient, so zypper is retried with a clean cache.
+retry() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    "$@" && return 0
+    echo "attempt $attempt failed: $*" >&2
+    zypper --non-interactive clean --all >/dev/null 2>&1 || true
+    sleep $((attempt * 20))
+  done
+  return 1
+}
+export -f retry
+
+retry zypper --non-interactive --gpg-auto-import-keys refresh
+retry zypper --non-interactive install --no-recommends rpm-build rpm-config-SUSE rpmdevtools createrepo_c \
   gpg2 tar gzip git curl
-command -v rsvg-convert >/dev/null || zypper --non-interactive install --no-recommends rsvg-convert
+command -v rsvg-convert >/dev/null || retry zypper --non-interactive install --no-recommends rsvg-convert
 
 mkdir -p "$work"/{SOURCES,RPMS,SRPMS,BUILD,BUILDROOT} "$out"
 
@@ -48,7 +62,7 @@ for spec in "$root"/*/*.spec; do
     [[ -e "$src/$name" ]] || { rpmdev-spectool --get-files --directory "$src" "$spec" >&2; break; }
   done < <(rpmdev-spectool --list-files "$spec" | awk '{print $2}' | sed 's|.*/||; s|#/||')
   rpmspec -q --buildrequires "$spec" | awk '{print $1}' | sort -u \
-    | xargs -r zypper --non-interactive install --no-recommends
+    | xargs -r bash -c 'retry zypper --non-interactive install --no-recommends "$@"' _
   rpmbuild -ba --define "_topdir $work" --define "_sourcedir $src" "$spec"
 done
 
