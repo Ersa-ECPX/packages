@@ -4,7 +4,21 @@ Release:        2%{?dist}
 Summary:        Ersa Compute Platform management command line
 License:        LicenseRef-Unknown
 BuildArch:      noarch
-Source0:        %{name}-%{version}.tar.gz
+URL:            https://github.com/Ersa-ECPX/foundation
+# The tag v<Version> of the foundation repository (its root is the source tree). The archive's top-level
+# directory is foundation-<Version>, which the %%autosetup below expects.
+Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
+
+# For %check (the unit tests run a private D-Bus session bus; tests of tools that are missing are skipped).
+BuildRequires:  python3 >= 3.9
+BuildRequires:  python3-gobject
+BuildRequires:  python3-solv
+BuildRequires:  dbus-1-daemon
+BuildRequires:  gpg2
+BuildRequires:  zstd
+BuildRequires:  systemd
+BuildRequires:  util-linux
+BuildRequires:  rpm
 
 Requires:       python3 >= 3.9
 # GLib/GDBus bindings (Tumbleweed names the real package per Python version, python313-gobject, and

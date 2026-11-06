@@ -1,0 +1,8 @@
+# Rendered from ersa-logo.svg and ersa-dark-logo.svg by scripts/build-repo
+ersa-boot-splash/SOURCES/ersa-logo.png
+ersa-boot-splash/SOURCES/ersa-logo@2x.png
+ersa-boot-splash/SOURCES/ersa-dark-logo.png
+ersa-boot-splash/SOURCES/ersa-dark-logo@2x.png
+*.rpm
+/build/
+/repo/

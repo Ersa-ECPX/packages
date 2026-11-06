@@ -1,0 +1,88 @@
+# UNTESTED: this workflow has never run on GitHub Actions. The build script it calls (scripts/build-repo) was
+# run once in a local Tumbleweed container for the `foundation` and `ersa-boot-splash` packages only; the
+# compiled packages, the GitHub-specific steps (secrets, cache, gh-pages deploy) and pull-request behaviour
+# are unverified. Read the comments, then try it on a branch.
+#
+# What it does
+#   build   (every push, pull request and tag): builds all specs in a Tumbleweed container with podman, creates
+#           the repository metadata with createrepo_c and, when the secrets exist, signs the RPMs and
+#           repodata/repomd.xml (repomd.xml.asc). foundation's repository code (repos.py) refuses a repository whose
+#           repomd.xml has no valid detached signature, so a published repository must be signed.
+#   publish (push to main, and tags v*): pushes the repository to the gh-pages branch, served by GitHub Pages at
+#           https://ersa-ecpx.github.io/packages/ . Each publish REPLACES the branch content: only the RPMs of the
+#           latest build are available.
+#
+# Secrets (Settings > Secrets and variables > Actions); none of them exist yet and no key has been created:
+#   GPG_PRIVATE_KEY   ASCII-armored secret key (gpg --armor --export-secret-keys KEYID) of the repository signing key
+#   GPG_PASSPHRASE    its passphrase (leave unset or empty for a key without one)
+# The matching public key is published as ersa-ecpx.asc next to the repodata; the same file must be shipped to
+# images (foundation keeps repository keys under /usr/share/foundation/keys) so that clients can verify it.
+#
+# One-time setup in the GitHub UI: the packages source repositories that specs download (Ersa-ECPX/Dialer,
+# Ersa-ECPX/ersa-bluetooth) must be readable by the workflow (public, or add a token), and the foundation spec
+# downloads the tag v<Version> of Ersa-ECPX/foundation, so that tag must exist before the build can succeed.
+# After the first publish, set Settings > Pages > Source to "Deploy from a branch", branch gh-pages, folder /.
+name: Build RPM repository
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-rpms-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and sign the repository in a Tumbleweed container
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          # Pull requests (and forks) have no secrets: build unsigned there; publishing requires a signed build.
+          REQUIRE_SIGNING: ${{ (github.event_name == 'push' && '1') || '0' }}
+        run: scripts/build-repo-podman repo
+
+      - name: Check that the signature verifies (signed builds only)
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          gpg --batch --import repo/ersa-ecpx.asc
+          gpg --batch --verify repo/repodata/repomd.xml.asc repo/repodata/repomd.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-repository
+          path: repo
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write          # pushing the gh-pages branch
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpm-repository
+          path: repo
+
+      - name: Publish to the gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: repo
+          force_orphan: true          # keep the branch at one commit: the RPMs are large and rebuilt every time
+          enable_jekyll: false        # adds .nojekyll
+          commit_message: "Publish ${{ github.sha }}"

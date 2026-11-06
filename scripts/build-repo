@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Build every package in this repository into a signed DNF/zypp repository. UNTESTED end to end (see README.md).
+#
+# Run it inside an openSUSE Tumbleweed container (the workflow and `scripts/build-repo-podman` do), never on the
+# host: compiled packages must be linked against the libraries of the image they are installed in.
+#
+#   scripts/build-repo [OUTPUT_DIR]                 default: repo/
+#
+# Environment:
+#   SOURCES_DIR         directory with ready-made source tarballs (named as the specs' Source0); a source that is
+#                       missing there is downloaded with rpmdev-spectool from the URL in the spec. Optional.
+#   GPG_PRIVATE_KEY     ASCII-armored secret key. When set, RPMs are signed (rpmsign) and repodata/repomd.xml gets the
+#                       detached signature repomd.xml.asc that foundation's repository code requires.
+#   GPG_PASSPHRASE      its passphrase, if it has one.
+#   ONLY                space-separated package names to build (default: all); for local tests
+#   REQUIRE_SIGNING=1   fail instead of producing an unsigned repository when GPG_PRIVATE_KEY is not set.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+root="$PWD"
+out="$(realpath -m "${1:-repo}")"
+work="${BUILD_DIR:-$(mktemp -d)}"
+
+zypper --non-interactive --gpg-auto-import-keys refresh
+zypper --non-interactive install --no-recommends rpm-build rpm-config-SUSE rpmdevtools createrepo_c \
+  gpg2 tar gzip git curl
+command -v rsvg-convert >/dev/null || zypper --non-interactive install --no-recommends rsvg-convert
+
+mkdir -p "$work"/{SOURCES,RPMS,SRPMS,BUILD,BUILDROOT} "$out"
+
+# Plymouth cannot load SVG: render the logo PNGs from the SVG in the package sources.
+splash="$root/ersa-boot-splash/SOURCES"
+rsvg-convert --width 160 --height 160 --keep-aspect-ratio "$splash/ersa-logo.svg" -o "$splash/ersa-logo.png"
+rsvg-convert --width 320 --height 320 --keep-aspect-ratio "$splash/ersa-logo.svg" -o "$splash/ersa-logo@2x.png"
+# The dark theme uses the light-coloured mark (ersa-dark-logo.svg), which reads on a dark background.
+rsvg-convert --width 160 --height 160 --keep-aspect-ratio "$splash/ersa-dark-logo.svg" -o "$splash/ersa-dark-logo.png"
+rsvg-convert --width 320 --height 320 --keep-aspect-ratio "$splash/ersa-dark-logo.svg" -o "$splash/ersa-dark-logo@2x.png"
+
+for spec in "$root"/*/*.spec; do
+  pkg="$(basename "$(dirname "$spec")")"
+  [[ -z "${ONLY:-}" || " $ONLY " == *" $pkg "* ]] || continue
+  echo "== $pkg" >&2
+  src="$work/SOURCES"
+  rm -rf "$src"; mkdir -p "$src"
+  [[ -d "$(dirname "$spec")/SOURCES" ]] && cp -a "$(dirname "$spec")/SOURCES/." "$src/"
+  [[ -n "${SOURCES_DIR:-}" ]] && cp -a "$SOURCES_DIR/." "$src/"
+  # Download what is still missing (Source0 URLs of ersa-bluetooth, ersa-dialer, foundation).
+  while read -r name; do
+    [[ -e "$src/$name" ]] || { rpmdev-spectool --get-files --directory "$src" "$spec" >&2; break; }
+  done < <(rpmdev-spectool --list-files "$spec" | awk '{print $2}' | sed 's|.*/||; s|#/||')
+  rpmspec -q --buildrequires "$spec" | awk '{print $1}' | sort -u \
+    | xargs -r zypper --non-interactive install --no-recommends
+  rpmbuild -ba --define "_topdir $work" --define "_sourcedir $src" "$spec"
+done
+
+# The image does not use debuginfo/debugsource packages.
+find "$work/RPMS" "$work/SRPMS" -name '*.rpm' -not -name '*-debuginfo-*' -not -name '*-debugsource-*' -exec cp -v {} "$out/" \;
+
+if [[ -n "${GPG_PRIVATE_KEY:-}" ]]; then
+  export GNUPGHOME="$work/gnupg"; mkdir -m 700 "$GNUPGHOME"
+  echo "allow-loopback-pinentry" > "$GNUPGHOME/gpg-agent.conf"
+  printf '%s\n' "$GPG_PRIVATE_KEY" | gpg --batch --import
+  keyid="$(gpg --batch --list-secret-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')"
+  gpg --batch --armor --export "$keyid" > "$out/ersa-ecpx.asc"
+  printf '%s' "${GPG_PASSPHRASE:-}" > "$GNUPGHOME/passphrase"; chmod 600 "$GNUPGHOME/passphrase"
+  gpgopts=(--batch --pinentry-mode loopback --passphrase-file "$GNUPGHOME/passphrase")
+  cat > "$work/rpmmacros" <<M
+%_gpg_name $keyid
+%__gpg_sign_cmd %{__gpg} gpg ${gpgopts[*]} --no-verbose --no-armor --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} --digest-algo sha256 %{__plaintext_filename}
+M
+  rpmsign --macros=/usr/lib/rpm/macros:"$work/rpmmacros" --addsign "$out"/*.rpm
+  createrepo_c --general-compress-type=gz "$out"
+  gpg "${gpgopts[@]}" --local-user "$keyid" --detach-sign --armor -o "$out/repodata/repomd.xml.asc" "$out/repodata/repomd.xml"
+else
+  [[ "${REQUIRE_SIGNING:-0}" != 1 ]] || { echo "GPG_PRIVATE_KEY is not set and REQUIRE_SIGNING=1" >&2; exit 1; }
+  echo "WARNING: GPG_PRIVATE_KEY not set: the repository is UNSIGNED and foundation will refuse it" >&2
+  createrepo_c --general-compress-type=gz "$out"
+fi
+
+cat > "$out/ersa.repo" <<'R'
+[ersa]
+name=Ersa Compute Platform packages
+enabled=1
+baseurl=https://ersa-ecpx.github.io/packages/
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://ersa-ecpx.github.io/packages/ersa-ecpx.asc
+R
+ls -la "$out" >&2
