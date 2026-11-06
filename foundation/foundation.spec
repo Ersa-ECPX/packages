@@ -24,6 +24,8 @@ Summary:        Ersa Compute Platform management service
 Requires:       python3 >= 3.9
 Requires:       python3-gobject
 Requires:       polkit
+Requires:       python3-solv
+Requires:       gpg2
 Requires:       dbus-1
 # Compat packages are inspected and unpacked with the rpm tools; boot slots are relabelled with
 # sfdisk; the unified kernel images and the default boot entry are handled with bootctl.
@@ -95,6 +97,11 @@ install -Dpm0644 data/systemd-user/foundation-provisioning.service %{buildroot}/
 install -Dpm0644 data/systemd-user/foundation-provisioning.path %{buildroot}/usr/lib/systemd/user/foundation-provisioning.path
 install -Dpm0644 data/config/schema.d/10-foundation.json %{buildroot}/usr/lib/foundation/schema.d/10-foundation.json
 install -d %{buildroot}/usr/lib/foundation/defaults.d
+install -Dpm0644 data/repos.d/opensuse-oss.repo %{buildroot}/usr/lib/foundation/repos.d/opensuse-oss.repo
+install -Dpm0644 data/repos.d/packman-essentials.repo %{buildroot}/usr/lib/foundation/repos.d/packman-essentials.repo
+install -Dpm0644 data/keys/opensuse.asc %{buildroot}/usr/share/foundation/keys/opensuse.asc
+install -Dpm0644 data/keys/packman.asc %{buildroot}/usr/share/foundation/keys/packman.asc
+install -Dpm0644 data/catalog.d/codecs.json %{buildroot}/usr/lib/foundation/catalog.d/codecs.json
 install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 
 %files
@@ -116,6 +123,9 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/foundationd/
 /usr/lib/foundation/schema.d/
 /usr/lib/foundation/defaults.d/
+/usr/lib/foundation/repos.d/
+/usr/lib/foundation/catalog.d/
+/usr/share/foundation/keys/
 /usr/libexec/foundationd
 /usr/libexec/foundationd-worker
 /usr/share/dbus-1/interfaces/org.ersa.Foundation1.xml
