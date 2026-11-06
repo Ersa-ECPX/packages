@@ -24,11 +24,9 @@
 # After the first publish, set Settings > Pages > Source to "Deploy from a branch", branch gh-pages, folder /.
 name: Build RPM repository
 
+# Manual only for now: the openSUSE mirror behind download.opensuse.org served an incomplete Tumbleweed index to the
+# runner (see scripts/build-repo), so every push failed. Images are built locally from the cloned sources.
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  pull_request:
   workflow_dispatch:
 
 concurrency:
