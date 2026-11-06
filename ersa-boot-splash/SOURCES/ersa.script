@@ -1,0 +1,61 @@
+Window.SetBackgroundTopColor(1, 1, 1);
+Window.SetBackgroundBottomColor(1, 1, 1);
+
+# The logo PNGs are rendered from branding/ersa-mark-light.svg at package build time.
+# Use the 2x rendering and a doubled layout on tall (HiDPI) screens.
+if (Window.GetHeight() >= 1200) {
+    ui_scale = 2;
+    logo_image = Image("ersa-logo@2x.png");
+    font_name = "Sans 24";
+} else {
+    ui_scale = 1;
+    logo_image = Image("ersa-logo.png");
+    font_name = "Sans 12";
+}
+
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetPosition(Window.GetWidth() / 2 - logo_image.GetWidth() / 2,
+                        Window.GetHeight() / 2 - logo_image.GetHeight() / 2 - 36 * ui_scale,
+                        10);
+
+track_image = Image("track.png").Scale(140 * ui_scale, 2 * ui_scale);
+track_sprite = Sprite(track_image);
+track_x = Window.GetWidth() / 2 - track_image.GetWidth() / 2;
+track_y = Window.GetHeight() / 2 + 66 * ui_scale;
+track_sprite.SetPosition(track_x, track_y, 10);
+
+fill_image = Image("fill.png").Scale(140 * ui_scale, 2 * ui_scale);
+fill_sprite = Sprite();
+fill_sprite.SetPosition(track_x, track_y, 11);
+
+fun progress_callback(duration, progress) {
+    width = Math.Int(track_image.GetWidth() * progress);
+    if (width < 1) {
+        fill_sprite.SetOpacity(0);
+    } else {
+        fill_sprite.SetOpacity(1);
+        fill_sprite.SetImage(fill_image.Scale(width, fill_image.GetHeight()));
+    }
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+# Status text under the progress bar. Shown with: plymouth display-message --text="..."
+# and cleared with: plymouth hide-message --text="..." (see /usr/libexec/ecp/splash).
+message_sprite = Sprite();
+message_y = track_y + track_image.GetHeight() + 28 * ui_scale;
+
+fun show_message(text) {
+    message_image = Image.Text(text, 0.35, 0.35, 0.35, 1, font_name, "center");
+    message_sprite.SetImage(message_image);
+    message_sprite.SetPosition(Window.GetWidth() / 2 - message_image.GetWidth() / 2,
+                               message_y, 12);
+    message_sprite.SetOpacity(1);
+}
+
+fun hide_message(text) {
+    message_sprite.SetOpacity(0);
+}
+
+Plymouth.SetDisplayMessageFunction(show_message);
+Plymouth.SetHideMessageFunction(hide_message);
