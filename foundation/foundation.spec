@@ -96,8 +96,6 @@ install -Dpm0644 data/systemd/foundation-bundles-select.service %{buildroot}/usr
 install -Dpm0644 data/systemd/foundation-bundles-refresh.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-refresh.service
 install -Dpm0644 data/systemd-user/foundation-update-notify.service %{buildroot}/usr/lib/systemd/user/foundation-update-notify.service
 install -Dpm0644 data/systemd-user/foundation-update-notify.path %{buildroot}/usr/lib/systemd/user/foundation-update-notify.path
-/usr/libexec/foundation-splash-sync
-/usr/lib/systemd/user/foundation-splash-sync.service
 install -Dpm0644 data/systemd-user/foundation-splash-sync.service %{buildroot}/usr/lib/systemd/user/foundation-splash-sync.service
 install -Dpm0644 data/dbus/org.ersa.Foundation1.xml %{buildroot}/usr/share/dbus-1/interfaces/org.ersa.Foundation1.xml
 install -Dpm0644 data/dbus/org.ersa.Foundation1.service %{buildroot}/usr/share/dbus-1/system-services/org.ersa.Foundation1.service
@@ -152,6 +150,8 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/libexec/foundation-update-notify
 /usr/lib/systemd/user/foundation-update-notify.service
 /usr/lib/systemd/user/foundation-update-notify.path
+/usr/libexec/foundation-splash-sync
+/usr/lib/systemd/user/foundation-splash-sync.service
 
 %changelog
 * Sat Nov 07 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-2
