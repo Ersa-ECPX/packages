@@ -26,6 +26,7 @@ Requires:       python3-gobject
 Requires:       polkit
 Requires:       python3-solv
 Requires:       gpg2
+Requires:       zstd
 Requires:       dbus-1
 # Compat packages are inspected and unpacked with the rpm tools; boot slots are relabelled with
 # sfdisk; the unified kernel images and the default boot entry are handled with bootctl.
@@ -88,6 +89,12 @@ install -Dpm0755 data/live/live-session %{buildroot}/usr/libexec/ecp/live-sessio
 install -Dpm0644 data/live/ersa-live-session.service %{buildroot}/usr/lib/systemd/system/ersa-live-session.service
 install -Dpm0755 data/libexec/foundationd %{buildroot}/usr/libexec/foundationd
 install -Dpm0755 data/libexec/foundationd-worker %{buildroot}/usr/libexec/foundationd-worker
+install -Dpm0755 data/libexec/foundation-bundles %{buildroot}/usr/libexec/foundation-bundles
+install -Dpm0755 data/libexec/foundation-update-notify %{buildroot}/usr/libexec/foundation-update-notify
+install -Dpm0644 data/systemd/foundation-bundles-select.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-select.service
+install -Dpm0644 data/systemd/foundation-bundles-refresh.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-refresh.service
+install -Dpm0644 data/systemd-user/foundation-update-notify.service %{buildroot}/usr/lib/systemd/user/foundation-update-notify.service
+install -Dpm0644 data/systemd-user/foundation-update-notify.path %{buildroot}/usr/lib/systemd/user/foundation-update-notify.path
 install -Dpm0644 data/dbus/org.ersa.Foundation1.xml %{buildroot}/usr/share/dbus-1/interfaces/org.ersa.Foundation1.xml
 install -Dpm0644 data/dbus/org.ersa.Foundation1.service %{buildroot}/usr/share/dbus-1/system-services/org.ersa.Foundation1.service
 install -Dpm0644 data/dbus/org.ersa.Foundation1.conf %{buildroot}/usr/share/dbus-1/system.d/org.ersa.Foundation1.conf
@@ -135,6 +142,12 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/system/foundationd.service
 /usr/lib/systemd/user/foundation-provisioning.service
 /usr/lib/systemd/user/foundation-provisioning.path
+/usr/lib/systemd/system/foundation-bundles-select.service
+/usr/lib/systemd/system/foundation-bundles-refresh.service
+/usr/libexec/foundation-bundles
+/usr/libexec/foundation-update-notify
+/usr/lib/systemd/user/foundation-update-notify.service
+/usr/lib/systemd/user/foundation-update-notify.path
 
 %changelog
 * Thu Nov 05 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-1
