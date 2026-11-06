@@ -81,6 +81,7 @@ install -pm0644 foundation_installer/*.py %{buildroot}/usr/lib/foundation/founda
 install -pm0644 foundation_installer/*.svg %{buildroot}/usr/lib/foundation/foundation_installer/
 install -Dpm0755 bin/ersa-installer %{buildroot}%{_bindir}/ersa-installer
 install -Dpm0644 data/applications/org.ersa.Installer.desktop %{buildroot}/usr/share/applications/org.ersa.Installer.desktop
+install -Dpm0644 data/icons/org.ersa.Installer.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/org.ersa.Installer.svg
 install -Dpm0755 data/live/live-session %{buildroot}/usr/libexec/ecp/live-session
 install -Dpm0644 data/live/ersa-live-session.service %{buildroot}/usr/lib/systemd/system/ersa-live-session.service
 install -Dpm0755 data/libexec/foundationd %{buildroot}/usr/libexec/foundationd
@@ -107,6 +108,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/foundation_installer/
 /usr/share/applications/org.ersa.Installer.desktop
 /usr/libexec/ecp/live-session
+/usr/share/icons/hicolor/scalable/apps/org.ersa.Installer.svg
 /usr/lib/systemd/system/ersa-live-session.service
 
 %files -n foundationd
