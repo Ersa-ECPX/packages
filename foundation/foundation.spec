@@ -83,8 +83,6 @@ install -Dpm0755 bin/ersa-installer %{buildroot}%{_bindir}/ersa-installer
 install -Dpm0644 data/applications/org.ersa.Installer.desktop %{buildroot}/usr/share/applications/org.ersa.Installer.desktop
 install -Dpm0755 data/live/live-session %{buildroot}/usr/libexec/ecp/live-session
 install -Dpm0644 data/live/ersa-live-session.service %{buildroot}/usr/lib/systemd/system/ersa-live-session.service
-install -d %{buildroot}/usr/lib/systemd/system/graphical.target.wants
-ln -s ../ersa-live-session.service %{buildroot}/usr/lib/systemd/system/graphical.target.wants/ersa-live-session.service
 install -Dpm0755 data/libexec/foundationd %{buildroot}/usr/libexec/foundationd
 install -Dpm0755 data/libexec/foundationd-worker %{buildroot}/usr/libexec/foundationd-worker
 install -Dpm0644 data/dbus/org.ersa.Foundation1.xml %{buildroot}/usr/share/dbus-1/interfaces/org.ersa.Foundation1.xml
@@ -110,7 +108,6 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/share/applications/org.ersa.Installer.desktop
 /usr/libexec/ecp/live-session
 /usr/lib/systemd/system/ersa-live-session.service
-/usr/lib/systemd/system/graphical.target.wants/ersa-live-session.service
 
 %files -n foundationd
 %dir /usr/lib/foundation
