@@ -1,0 +1,68 @@
+# THEME VARIABLES (the only lines that differ between ersa.script and ersa-dark.script)
+bg_r = 0.106; bg_g = 0.122; bg_b = 0.114;
+logo_file = "ersa-dark-logo.png"; logo_file_2x = "ersa-dark-logo@2x.png";
+fill_file = "fill-dark.png"; track_file = "track-dark.png";
+text_r = 0.75; text_g = 0.78; text_b = 0.76;
+# END THEME VARIABLES
+
+Window.SetBackgroundTopColor(bg_r, bg_g, bg_b);
+Window.SetBackgroundBottomColor(bg_r, bg_g, bg_b);
+
+# The logo PNGs are rendered from branding/ersa-mark-light.svg (ersa-dark: ersa-mark-dark.svg) at package build time.
+# Use the 2x rendering and a doubled layout on tall (HiDPI) screens.
+if (Window.GetHeight() >= 1200) {
+    ui_scale = 2;
+    logo_image = Image(logo_file_2x);
+    font_name = "Sans 24";
+} else {
+    ui_scale = 1;
+    logo_image = Image(logo_file);
+    font_name = "Sans 12";
+}
+
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetPosition(Window.GetWidth() / 2 - logo_image.GetWidth() / 2,
+                        Window.GetHeight() / 2 - logo_image.GetHeight() / 2 - 36 * ui_scale,
+                        10);
+
+track_image = Image(track_file).Scale(140 * ui_scale, 2 * ui_scale);
+track_sprite = Sprite(track_image);
+track_x = Window.GetWidth() / 2 - track_image.GetWidth() / 2;
+track_y = Window.GetHeight() / 2 + 66 * ui_scale;
+track_sprite.SetPosition(track_x, track_y, 10);
+
+fill_image = Image(fill_file).Scale(140 * ui_scale, 2 * ui_scale);
+fill_sprite = Sprite();
+fill_sprite.SetPosition(track_x, track_y, 11);
+
+fun progress_callback(duration, progress) {
+    width = Math.Int(track_image.GetWidth() * progress);
+    if (width < 1) {
+        fill_sprite.SetOpacity(0);
+    } else {
+        fill_sprite.SetOpacity(1);
+        fill_sprite.SetImage(fill_image.Scale(width, fill_image.GetHeight()));
+    }
+}
+
+Plymouth.SetBootProgressFunction(progress_callback);
+
+# Status text under the progress bar. Shown with: plymouth display-message --text="..."
+# and cleared with: plymouth hide-message --text="..." (see /usr/libexec/ecp/splash).
+message_sprite = Sprite();
+message_y = track_y + track_image.GetHeight() + 28 * ui_scale;
+
+fun show_message(text) {
+    message_image = Image.Text(text, text_r, text_g, text_b, 1, font_name, "center");
+    message_sprite.SetImage(message_image);
+    message_sprite.SetPosition(Window.GetWidth() / 2 - message_image.GetWidth() / 2,
+                               message_y, 12);
+    message_sprite.SetOpacity(1);
+}
+
+fun hide_message(text) {
+    message_sprite.SetOpacity(0);
+}
+
+Plymouth.SetDisplayMessageFunction(show_message);
+Plymouth.SetHideMessageFunction(hide_message);

@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Ersa Dark
+Description=Ersa boot logo and progress line on a dark background
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/ersa-dark
+ScriptFile=/usr/share/plymouth/themes/ersa-dark/ersa-dark.script

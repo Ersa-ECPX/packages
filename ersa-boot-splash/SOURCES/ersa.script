@@ -1,15 +1,22 @@
-Window.SetBackgroundTopColor(1, 1, 1);
-Window.SetBackgroundBottomColor(1, 1, 1);
+# THEME VARIABLES (the only lines that differ between ersa.script and ersa-dark.script)
+bg_r = 1; bg_g = 1; bg_b = 1;
+logo_file = "ersa-logo.png"; logo_file_2x = "ersa-logo@2x.png";
+fill_file = "fill.png"; track_file = "track.png";
+text_r = 0.35; text_g = 0.35; text_b = 0.35;
+# END THEME VARIABLES
 
-# The logo PNGs are rendered from branding/ersa-mark-light.svg at package build time.
+Window.SetBackgroundTopColor(bg_r, bg_g, bg_b);
+Window.SetBackgroundBottomColor(bg_r, bg_g, bg_b);
+
+# The logo PNGs are rendered from branding/ersa-mark-light.svg (ersa-dark: ersa-mark-dark.svg) at package build time.
 # Use the 2x rendering and a doubled layout on tall (HiDPI) screens.
 if (Window.GetHeight() >= 1200) {
     ui_scale = 2;
-    logo_image = Image("ersa-logo@2x.png");
+    logo_image = Image(logo_file_2x);
     font_name = "Sans 24";
 } else {
     ui_scale = 1;
-    logo_image = Image("ersa-logo.png");
+    logo_image = Image(logo_file);
     font_name = "Sans 12";
 }
 
@@ -18,13 +25,13 @@ logo_sprite.SetPosition(Window.GetWidth() / 2 - logo_image.GetWidth() / 2,
                         Window.GetHeight() / 2 - logo_image.GetHeight() / 2 - 36 * ui_scale,
                         10);
 
-track_image = Image("track.png").Scale(140 * ui_scale, 2 * ui_scale);
+track_image = Image(track_file).Scale(140 * ui_scale, 2 * ui_scale);
 track_sprite = Sprite(track_image);
 track_x = Window.GetWidth() / 2 - track_image.GetWidth() / 2;
 track_y = Window.GetHeight() / 2 + 66 * ui_scale;
 track_sprite.SetPosition(track_x, track_y, 10);
 
-fill_image = Image("fill.png").Scale(140 * ui_scale, 2 * ui_scale);
+fill_image = Image(fill_file).Scale(140 * ui_scale, 2 * ui_scale);
 fill_sprite = Sprite();
 fill_sprite.SetPosition(track_x, track_y, 11);
 
@@ -46,7 +53,7 @@ message_sprite = Sprite();
 message_y = track_y + track_image.GetHeight() + 28 * ui_scale;
 
 fun show_message(text) {
-    message_image = Image.Text(text, 0.35, 0.35, 0.35, 1, font_name, "center");
+    message_image = Image.Text(text, text_r, text_g, text_b, 1, font_name, "center");
     message_sprite.SetImage(message_image);
     message_sprite.SetPosition(Window.GetWidth() / 2 - message_image.GetWidth() / 2,
                                message_y, 12);

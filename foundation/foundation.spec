@@ -1,6 +1,6 @@
 Name:           foundation
 Version:        0.5.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Ersa Compute Platform management command line
 License:        LicenseRef-Unknown
 BuildArch:      noarch
@@ -91,10 +91,14 @@ install -Dpm0755 data/libexec/foundationd %{buildroot}/usr/libexec/foundationd
 install -Dpm0755 data/libexec/foundationd-worker %{buildroot}/usr/libexec/foundationd-worker
 install -Dpm0755 data/libexec/foundation-bundles %{buildroot}/usr/libexec/foundation-bundles
 install -Dpm0755 data/libexec/foundation-update-notify %{buildroot}/usr/libexec/foundation-update-notify
+install -Dpm0755 data/libexec/foundation-splash-sync %{buildroot}/usr/libexec/foundation-splash-sync
 install -Dpm0644 data/systemd/foundation-bundles-select.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-select.service
 install -Dpm0644 data/systemd/foundation-bundles-refresh.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-refresh.service
 install -Dpm0644 data/systemd-user/foundation-update-notify.service %{buildroot}/usr/lib/systemd/user/foundation-update-notify.service
 install -Dpm0644 data/systemd-user/foundation-update-notify.path %{buildroot}/usr/lib/systemd/user/foundation-update-notify.path
+/usr/libexec/foundation-splash-sync
+/usr/lib/systemd/user/foundation-splash-sync.service
+install -Dpm0644 data/systemd-user/foundation-splash-sync.service %{buildroot}/usr/lib/systemd/user/foundation-splash-sync.service
 install -Dpm0644 data/dbus/org.ersa.Foundation1.xml %{buildroot}/usr/share/dbus-1/interfaces/org.ersa.Foundation1.xml
 install -Dpm0644 data/dbus/org.ersa.Foundation1.service %{buildroot}/usr/share/dbus-1/system-services/org.ersa.Foundation1.service
 install -Dpm0644 data/dbus/org.ersa.Foundation1.conf %{buildroot}/usr/share/dbus-1/system.d/org.ersa.Foundation1.conf
@@ -150,6 +154,8 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/user/foundation-update-notify.path
 
 %changelog
+* Sat Nov 07 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-2
+- Add `foundation splash light|dark` (Boot.SetSplash) and foundation-splash-sync.service, which makes the boot splash follow the desktop style
 * Thu Nov 05 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-1
 - Add `foundation deploy` and the Deploy interface: install the running system to a disk
 - Add the foundation-installer subpackage: a step-by-step graphical installer (GTK 4, libadwaita)
