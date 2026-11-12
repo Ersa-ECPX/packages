@@ -7,24 +7,35 @@ repository implement.
 
 - **Releases hold the files.** Each upload is a GitHub release (tag such as `r20261112`) with the RPMs attached. They stay
   there, so an old version is always one link away.
-- **This site holds the current repository.** When a release is published, a workflow downloads that release's RPMs,
-  signs them, builds the repository metadata and deploys the result with GitHub Pages. Only the newest release is in `/repo/`.
+- **This site holds the current repository.** After a release, a workflow downloads its RPMs, signs them, builds the repository
+  metadata and deploys the result with GitHub Pages. Only the newest release is in `/repo/`.
 - **The wiki and the API reference are built at the same time.** `/wiki/` is the platform documentation (the Markdown of
   `ecp-mkosi` plus the `foundation` README, by `ecp-mkosi/scripts/build-wiki`). `/wiki/api/` is Doxygen over the sources of
   `ersa-bluetooth` and the Dialer at the commits their specs pin (`docs/doxygen/Doxyfile`). Both come from the public
   repositories as they are when a release is published, so a release always carries current documentation.
-- **Nothing is built by the workflow.** Building is done in a Tumbleweed container on a developer's machine
-  (`scripts/build-repo-podman`). A first attempt to build on GitHub's runners failed because of an incomplete openSUSE mirror, and
-  this way it cannot.
+- **GitHub builds the RPMs, in a container.** The build runs in an openSUSE Tumbleweed container (`scripts/build-repo-podman`)
+  and takes its packages from openSUSE's own build servers (`OPENSUSE_MIRROR`), not from the download.opensuse.org
+  redirector. An earlier attempt used the redirector, which sent the runner to a mirror that was mid-sync, and failed every time.
 
 ## To publish
 
 ```
-scripts/build-repo-podman repo                 # build everything in a container (or use the RPMs of an image build)
-scripts/release-rpms r20261112 repo            # create the release and attach the RPMs (add --draft to look first)
+git tag r20261112 && git push origin r20261112
 ```
 
-Publishing the release starts the workflow `Publish packages site`. You can also start it by hand from the Actions tab.
+That is all: `.github/workflows/build-rpms.yml` builds every package, creates the release with the RPMs attached and runs the
+publishing workflow. It can also be started by hand from the Actions tab (give it the tag to create).
+
+Before tagging, anything a spec downloads must exist. The `foundation` spec builds the tag `v<Version>` of the `foundation`
+repository, so tag that first and bump `Version:` here; `ersa-bluetooth` and `ersa-dialer` build the commit pinned in their
+`%global commit`.
+
+To build on your own machine instead (for a look before tagging, or without GitHub):
+
+```
+scripts/build-repo-podman repo                 # every package in a container
+scripts/release-rpms r20261112 repo --draft    # create a draft release with the RPMs; publishing it runs the publishing workflow
+```
 
 ## One-time setup
 
@@ -44,8 +55,8 @@ Publishing the release starts the workflow `Publish packages site`. You can also
 | `scripts/release-rpms` | creates a release with the RPMs |
 | `scripts/make-signing-key` | makes the signing key |
 | `docs/doxygen/Doxyfile` | the C++ API reference |
-| `.github/workflows/pages.yml` | publishes on every release |
-| `.github/workflows/build-rpms.yml` | the old build workflow, manual only |
+| `.github/workflows/build-rpms.yml` | builds, makes the release and publishes, on a tag |
+| `.github/workflows/pages.yml` | signs and publishes the site for a release |
 
 ## Limits
 

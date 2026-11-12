@@ -14,6 +14,9 @@
 #   GPG_PASSPHRASE      its passphrase, if it has one.
 #   ONLY                space-separated package names to build (default: all); for local tests
 #   REQUIRE_SIGNING=1   fail instead of producing an unsigned repository when GPG_PRIVATE_KEY is not set.
+#   OPENSUSE_MIRROR     a server to use instead of download.opensuse.org, for example https://provo-mirror.opensuse.org. The
+#                       redirector sends every request to some mirror, and one that is mid-sync can lack a file its own index
+#                       lists; the build servers of openSUSE itself are always consistent. The workflow sets it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 root="$PWD"
@@ -33,6 +36,11 @@ retry() {
   return 1
 }
 export -f retry
+
+if [[ -n "${OPENSUSE_MIRROR:-}" ]]; then
+  sed -i "s|https\?://download.opensuse.org|${OPENSUSE_MIRROR%/}|g" /etc/zypp/repos.d/*.repo
+  echo "using ${OPENSUSE_MIRROR%/} for the openSUSE repositories" >&2
+fi
 
 retry zypper --non-interactive --gpg-auto-import-keys refresh
 retry zypper --non-interactive install --no-recommends rpm-build rpm-config-SUSE rpmdevtools createrepo_c \

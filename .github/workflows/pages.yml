@@ -1,8 +1,9 @@
 # Publishes https://pkgs-compute.ersa.dev : the documentation, a page per package and the current RPM repository.
 #
-# It builds nothing. The RPMs are built in a container on a developer's machine (scripts/build-repo-podman) and attached to a
-# GitHub release with scripts/release-rpms; publishing that release runs this workflow, which downloads the release's RPMs, signs
-# them and the repository metadata (when the secrets exist), and deploys the result with GitHub Pages. See docs/publishing.md.
+# It builds no RPMs. Those come from a release: made by build-rpms.yml (push a tag), or by hand with scripts/release-rpms. Publishing a
+# release by hand runs this workflow; build-rpms.yml calls it itself, because a release created with the workflow's own token does
+# not start other workflows. It downloads the release's RPMs, signs them and the repository metadata (when the secrets exist), and
+# deploys the result with GitHub Pages. See docs/publishing.md.
 #
 # One-time setup (nothing here has run yet): Settings > Pages > Source "GitHub Actions" and the custom domain pkgs-compute.ersa.dev
 # (DNS: CNAME packages -> ersa-ecpx.github.io); secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE from scripts/make-signing-key. Without
@@ -16,6 +17,11 @@ on:
     inputs:
       tag:
         description: "Release tag to publish (default: the newest release)"
+        required: false
+  workflow_call:                       # build-rpms.yml calls this once it has made the release
+    inputs:
+      tag:
+        type: string
         required: false
 
 permissions:

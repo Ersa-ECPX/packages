@@ -2,11 +2,12 @@
 # Run scripts/build-repo in a Tumbleweed container, the way the workflow does. Output: repo/ (or $1).
 #   GPG_PRIVATE_KEY="$(cat key.asc)" scripts/build-repo-podman
 #   SOURCES_DIR=/path/to/tarballs scripts/build-repo-podman      # use local source tarballs instead of downloading
+#   OPENSUSE_MIRROR=https://provo-mirror.opensuse.org scripts/build-repo-podman   # not the download.opensuse.org redirector
 set -euo pipefail
 cd "$(dirname "$0")/.."
 out="${1:-repo}"; mkdir -p "$out"
 extra=()
 [[ -n "${SOURCES_DIR:-}" ]] && extra+=(--volume "$(realpath "$SOURCES_DIR"):/sources:ro" -e SOURCES_DIR=/sources)
 podman run --rm --security-opt label=disable --volume "$PWD:/pkgs:rw" "${extra[@]}" \
-  -e GPG_PRIVATE_KEY -e GPG_PASSPHRASE -e REQUIRE_SIGNING -e ONLY --workdir /pkgs \
+  -e GPG_PRIVATE_KEY -e GPG_PASSPHRASE -e REQUIRE_SIGNING -e ONLY -e OPENSUSE_MIRROR --workdir /pkgs \
   "${ECP_BUILD_IMAGE:-registry.opensuse.org/opensuse/tumbleweed:latest}" scripts/build-repo "/pkgs/$out"

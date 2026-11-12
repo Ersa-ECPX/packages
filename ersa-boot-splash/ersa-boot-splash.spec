@@ -23,7 +23,7 @@ Source12:       track-dark.png
 
 %description
 The Ersa Plymouth themes, including their logo and progress bar assets: ersa (light, the default)
-and ersa-dark (selected with plymouth.splash=ersa-dark on the kernel command line).
+and ersa-dark (selected through plymouthd.conf; foundation switches it with a UEFI variable).
 
 %prep
 

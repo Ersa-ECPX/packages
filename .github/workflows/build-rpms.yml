@@ -1,37 +1,33 @@
-# UNTESTED: this workflow has never run on GitHub Actions. The build script it calls (scripts/build-repo) was
-# run once in a local Tumbleweed container for the `foundation` and `ersa-boot-splash` packages only; the
-# compiled packages, the GitHub-specific steps (secrets, cache, gh-pages deploy) and pull-request behaviour
-# are unverified. Read the comments, then try it on a branch.
+# Builds the RPMs on GitHub, attaches them to a release and publishes the site: push a tag such as r20261112 and everything follows.
 #
-# What it does
-#   build   (every push, pull request and tag): builds all specs in a Tumbleweed container with podman, creates
-#           the repository metadata with createrepo_c and, when the secrets exist, signs the RPMs and
-#           repodata/repomd.xml (repomd.xml.asc). foundation's repository code (repos.py) refuses a repository whose
-#           repomd.xml has no valid detached signature, so a published repository must be signed.
-#   publish (push to main, and tags v*): pushes the repository to the gh-pages branch, served by GitHub Pages at
-#           https://ersa-ecpx.github.io/packages/ . Each publish REPLACES the branch content: only the RPMs of the
-#           latest build are available.
+#   git tag r20261112 && git push origin r20261112
 #
-# Secrets (Settings > Secrets and variables > Actions); none of them exist yet and no key has been created:
-#   GPG_PRIVATE_KEY   ASCII-armored secret key (gpg --armor --export-secret-keys KEYID) of the repository signing key
-#   GPG_PASSPHRASE    its passphrase (leave unset or empty for a key without one)
-# The matching public key is published as ersa-ecpx.asc next to the repodata; the same file must be shipped to
-# images (foundation keeps repository keys under /usr/share/foundation/keys) so that clients can verify it.
+# or run the workflow by hand (Actions > Build and publish packages > Run workflow) and give the tag, which it creates on the chosen
+# commit. The steps:
+#   build    every package in an openSUSE Tumbleweed container (scripts/build-repo-podman). The container takes its packages from
+#            openSUSE's own build servers, not from the download.opensuse.org redirector: the redirector sent an earlier attempt to a
+#            mirror that was mid-sync ("File appdata.xml.gz not found on medium") and every run failed.
+#   release  creates the GitHub release with the RPMs (and source RPMs) attached, so each version stays downloadable.
+#   publish  runs pages.yml for that release: signs, builds the repository and deploys https://pkgs-compute.ersa.dev .
 #
-# One-time setup in the GitHub UI: the packages source repositories that specs download (Ersa-ECPX/Dialer,
-# Ersa-ECPX/ersa-bluetooth) must be readable by the workflow (public, or add a token), and the foundation spec
-# downloads the tag v<Version> of Ersa-ECPX/foundation, so that tag must exist before the build can succeed.
-# After the first publish, set Settings > Pages > Source to "Deploy from a branch", branch gh-pages, folder /.
-name: Build RPM repository
+# NOT RUN YET. What is verified: scripts/build-repo, run in a local Tumbleweed container, built `foundation` and `ersa-boot-splash`.
+# Unverified: this file, the compiled packages in a runner, and the hand-over to pages.yml. A package whose spec downloads a source
+# (foundation: the tag v<Version> of the foundation repository; ersa-bluetooth and ersa-dialer: the pinned commit) fails when that
+# source does not exist, so tag foundation before the packages that need it.
+name: Build and publish packages
 
-# Manual only for now: the openSUSE mirror behind download.opensuse.org served an incomplete Tumbleweed index to the
-# runner (see scripts/build-repo), so every push failed. Images are built locally from the cloned sources.
 on:
+  push:
+    tags: ["r[0-9]*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, for example r20261112"
+        required: true
 
 concurrency:
-  group: build-rpms-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-packages
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -39,48 +35,60 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 150
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and sign the repository in a Tumbleweed container
+      - id: tag
         env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          # Pull requests (and forks) have no secrets: build unsigned there; publishing requires a signed build.
-          REQUIRE_SIGNING: ${{ (github.event_name == 'push' && '1') || '0' }}
-        run: scripts/build-repo-podman repo
-
-      - name: Check that the signature verifies (signed builds only)
-        if: ${{ github.event_name == 'push' }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          gpg --batch --import repo/ersa-ecpx.asc
-          gpg --batch --verify repo/repodata/repomd.xml.asc repo/repodata/repomd.xml
+          tag="${INPUT_TAG:-$GITHUB_REF_NAME}"
+          [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "unusable tag: $tag" >&2; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build every package in a Tumbleweed container
+        env:
+          OPENSUSE_MIRROR: https://provo-mirror.opensuse.org
+        run: scripts/build-repo-podman rpms
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rpm-repository
-          path: repo
+          name: rpms
+          path: rpms/*.rpm
           if-no-files-found: error
 
-  publish:
+  release:
     needs: build
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-24.04
     permissions:
-      contents: write          # pushing the gh-pages branch
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: rpm-repository
-          path: repo
+          name: rpms
+          path: rpms
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          notes="RPMs for openSUSE Tumbleweed:"$'\n\n'
+          for file in rpms/*.rpm; do notes+="- $(basename "$file")"$'\n'; done
+          notes+=$'\n'"Published at https://pkgs-compute.ersa.dev."
+          gh release create "$TAG" rpms/*.rpm --repo "$REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Packages $TAG" --notes "$notes"
 
-      - name: Publish to the gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: gh-pages
-          publish_dir: repo
-          force_orphan: true          # keep the branch at one commit: the RPMs are large and rebuilt every time
-          enable_jekyll: false        # adds .nojekyll
-          commit_message: "Publish ${{ github.sha }}"
+  publish:
+    needs: [build, release]
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml
+    with:
+      tag: ${{ needs.build.outputs.tag }}
+    secrets: inherit

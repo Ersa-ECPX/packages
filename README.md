@@ -38,24 +38,26 @@ Releasing a new `foundation`: tag `v<Version>` in the `foundation` repository, b
 ## Publishing: pkgs-compute.ersa.dev (planned, not yet run)
 
 The packages are published at **https://pkgs-compute.ersa.dev** (GitHub Pages): a page for each package, the current signed RPM
-repository, the platform wiki at `/wiki/` and the C++ API reference at `/wiki/api/` (the same layout as pkgs-wearables.ersa.dev). Each upload is also kept as a GitHub release with its files, so every older version stays
-downloadable and the package pages link them. Nothing is built on GitHub: you build in the container, then
+repository, the platform wiki at `/wiki/` and the C++ API reference at `/wiki/api/` (the same layout as pkgs-wearables.ersa.dev).
+Each upload is also kept as a GitHub release with its files, so every older version stays downloadable and the package pages
+link them. GitHub builds the packages, in a Tumbleweed container (`.github/workflows/build-rpms.yml`):
 
 ```sh
-scripts/build-repo-podman repo            # or use the RPMs an image build made (ecp-mkosi: mkosi.packages/)
-scripts/release-rpms r20261112 repo       # create the release and attach the RPMs (--draft to look first)
+git tag r20261112 && git push origin r20261112     # builds, makes the release, signs and publishes
 ```
 
-Publishing the release starts `.github/workflows/pages.yml`, which downloads its RPMs, signs them and the repository metadata
-and deploys the site. The setup (Pages source, DNS, the signing key from `scripts/make-signing-key`) and the limits are in
+Before tagging, whatever a spec downloads must exist (`foundation` builds the tag `v<Version>` of the `foundation` repository). To
+build on your own machine instead: `scripts/build-repo-podman repo`, then `scripts/release-rpms r20261112 repo --draft`.
+
+The setup (Pages source, DNS, the signing key from `scripts/make-signing-key`) and the limits are in
 [docs/publishing.md](docs/publishing.md); `scripts/build-site OUTPUT` builds the same site locally (`--rpms DIR` to include a
-repository). Tested so far: the site generator and its tests, the signing of RPMs with a throwaway key (rpm 6). Not run: anything
-on GitHub, `createrepo_c`, the older rpm signing path (Tumbleweed, Ubuntu), and a client using the repository.
+repository). The container takes its packages from openSUSE's own servers (`OPENSUSE_MIRROR`, set by the workflow) instead of the
+download.opensuse.org redirector, which once sent a runner to a mirror that was mid-sync. Tested so far: the site generator and its
+tests, the signing of RPMs with a throwaway key (rpm 6), the Doxygen reference (`docs/doxygen/Doxyfile`, Doxygen 1.18 on the sources
+at the pinned commits: no warnings, about 90 classes), and `scripts/build-repo` in a local container. Not run: anything on GitHub,
+`createrepo_c` on the host, the older rpm signing path (Tumbleweed, Ubuntu), and a client using the repository.
 
 The repository file `ersa.repo` it publishes turns on `gpgcheck=1` and `repo_gpgcheck=1`. The image build (`ecp-mkosi`) does not
 use this repository yet: it builds the same packages into its local `mkosi.packages/` directory.
-
-`.github/workflows/build-rpms.yml` is the earlier idea (build everything on GitHub's runners); it stays manual-only because the
-openSUSE mirror served an incomplete index to the runner.
 
 Tests: `python3 -m unittest discover -s tests`.
