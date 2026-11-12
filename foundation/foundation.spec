@@ -125,6 +125,7 @@ install -Dpm0644 data/repos.d/packman-essentials.repo %{buildroot}/usr/lib/found
 install -Dpm0644 data/keys/opensuse.asc %{buildroot}/usr/share/foundation/keys/opensuse.asc
 install -Dpm0644 data/keys/packman.asc %{buildroot}/usr/share/foundation/keys/packman.asc
 install -Dpm0644 data/catalog.d/codecs.json %{buildroot}/usr/lib/foundation/catalog.d/codecs.json
+install -Dpm0644 data/post-merge.d/10-gsettings.json %{buildroot}/usr/lib/foundation/post-merge.d/10-gsettings.json
 install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 
 %files
@@ -148,6 +149,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/defaults.d/
 /usr/lib/foundation/repos.d/
 /usr/lib/foundation/catalog.d/
+/usr/lib/foundation/post-merge.d/
 /usr/share/foundation/keys/
 /usr/libexec/foundationd
 /usr/libexec/foundationd-worker
