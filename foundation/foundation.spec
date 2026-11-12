@@ -1,6 +1,6 @@
 Name:           foundation
-Version:        0.5.0
-Release:        2%{?dist}
+Version:        0.6.0
+Release:        1%{?dist}
 Summary:        Ersa Compute Platform management command line
 License:        LicenseRef-Unknown
 BuildArch:      noarch
@@ -42,7 +42,7 @@ Requires:       python3-solv
 Requires:       gpg2
 Requires:       zstd
 Requires:       dbus-1
-# Compat packages are inspected and unpacked with the rpm tools; boot slots are relabelled with
+# Compat packages are inspected and unpacked with the rpm tools; the GPT UUIDs of boot slots are set with
 # sfdisk; the unified kernel images and the default boot entry are handled with bootctl.
 Requires:       rpm
 Requires:       util-linux
@@ -173,6 +173,12 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/user/foundation-splash-sync.service
 
 %changelog
+* Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-1
+- Slots are dm-verity pairs (root and hash partition) with fixed labels, named by the root hash; one update archive format
+  carrying the hash tree; kernel images are installed unchanged (signed for Secure Boot); `slot copy` removed
+- `foundation deploy` installs the installer medium's payload (the normal image's update archive)
+- Update signatures: refuse expired and revoked keys; image signing key script
+- Add `foundation remote` (SSH), scriptlet handling and post-merge jobs for compat packages, splash theme as a UEFI variable
 * Sat Nov 07 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-2
 - Add `foundation splash light|dark` (Boot.SetSplash) and foundation-splash-sync.service, which makes the boot splash follow the desktop style
 * Thu Nov 05 2026 Ersa Compute Platform <ecp@ersa.local> - 0.5.0-1
