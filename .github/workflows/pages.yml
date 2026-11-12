@@ -79,7 +79,9 @@ jobs:
           }
           fetch ersa-bluetooth ersa-bluetooth ersa-bluetooth/ersa-bluetooth.spec
           fetch dialer Dialer ersa-dialer/ersa-dialer.spec
-          mkdir -p site/wiki/api
+          mkdir -p src/pages site/wiki/api       # Doxygen does not make a page of README.md, so each README is copied under its own name
+          cp src/ersa-bluetooth/README.md src/pages/ersa-bluetooth.md
+          cp src/dialer/README.md src/pages/dialer.md
           DOX_SOURCES="$PWD/src" DOX_OUTPUT="$PWD/site/wiki/api" doxygen docs/doxygen/Doxyfile
 
       - name: Check the signature (signed builds only)

@@ -2,6 +2,7 @@
 # The workflow (.github/workflows/pages.yml) fetches the sources at the commits the specs pin into $(DOX_SOURCES) and sets
 # $(DOX_OUTPUT); to build it yourself:
 #   mkdir -p /tmp/dox && git -C /tmp/dox clone https://github.com/Ersa-ECPX/ersa-bluetooth && git -C /tmp/dox clone https://github.com/Ersa-ECPX/Dialer dialer
+#   mkdir /tmp/dox/pages && cp /tmp/dox/ersa-bluetooth/README.md /tmp/dox/pages/ersa-bluetooth.md && cp /tmp/dox/dialer/README.md /tmp/dox/pages/dialer.md
 #   DOX_SOURCES=/tmp/dox DOX_OUTPUT=/tmp/dox-out doxygen docs/doxygen/Doxyfile
 # The code has no Doxygen comments yet, so the reference shows structure (files, classes, who includes whom) and the Markdown
 # documents, not prose; EXTRACT_ALL is on for that reason. Comments written as /// or /** */ are picked up as they appear.
@@ -10,11 +11,14 @@ PROJECT_BRIEF          = "ersa-bluetooth (the Bluetooth bridge) and the Dialer"
 OUTPUT_DIRECTORY       = $(DOX_OUTPUT)
 HTML_OUTPUT            = .
 CREATE_SUBDIRS         = NO
-INPUT                  = $(DOX_SOURCES)/ersa-bluetooth $(DOX_SOURCES)/dialer
+INPUT                  = docs/doxygen/mainpage.md $(DOX_SOURCES)/ersa-bluetooth $(DOX_SOURCES)/dialer $(DOX_SOURCES)/pages
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = $(DOX_SOURCES)
 FILE_PATTERNS          = *.h *.hpp *.cc *.cpp *.md
 RECURSIVE              = YES
-EXCLUDE_PATTERNS       = */build/* */.git/* */tests/*
-USE_MDFILE_AS_MAINPAGE = $(DOX_SOURCES)/ersa-bluetooth/README.md
+# README.md is not turned into a page by Doxygen, so the workflow copies each README to $(DOX_SOURCES)/pages/<name>.md
+EXCLUDE_PATTERNS       = */build/* */.git/* */tests/* */README.md
+USE_MDFILE_AS_MAINPAGE = docs/doxygen/mainpage.md
 MARKDOWN_SUPPORT       = YES
 EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = YES
