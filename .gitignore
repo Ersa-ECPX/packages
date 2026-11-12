@@ -6,3 +6,10 @@ ersa-boot-splash/SOURCES/ersa-dark-logo@2x.png
 *.rpm
 /build/
 /repo/
+__pycache__/
+/site/
+
+# the signing key must never be committed (scripts/make-signing-key writes it here by default)
+/signing-key/
+secret-key.asc
+passphrase.txt

@@ -94,9 +94,9 @@ cat > "$out/ersa.repo" <<'R'
 [ersa]
 name=Ersa Compute Platform packages
 enabled=1
-baseurl=https://ersa-ecpx.github.io/packages/
+baseurl=https://packages.ersa.dev/repo/
 gpgcheck=1
 repo_gpgcheck=1
-gpgkey=https://ersa-ecpx.github.io/packages/ersa-ecpx.asc
+gpgkey=https://packages.ersa.dev/ersa-ecpx.asc
 R
 ls -la "$out" >&2

@@ -1,0 +1,441 @@
+#!/usr/bin/env python3
+"""Build the packages site: documentation, a page per package and (given RPMs) the signed RPM repository itself.
+
+    scripts/build-site OUTPUT [--rpms DIR] [--releases FILE | --repo OWNER/NAME] [--cname DOMAIN] [--base-url URL]
+
+OUTPUT is a folder ready for GitHub Pages: pages at its root, the repository in `repo/`, a `CNAME` (with --cname) and an empty
+`.nojekyll`. Nothing is fetched from the network unless asked: the descriptions come from the specs in this repository and
+the documents from docs/.
+
+  --rpms DIR        RPMs to serve as the repository (source, debuginfo and debugsource packages are left out; the releases keep them). `createrepo_c` makes the
+                    metadata. When GPG_PRIVATE_KEY (and GPG_PASSPHRASE) are in the environment the RPMs and the repository are
+                    signed and the public key is published as ersa-ecpx.asc; without a key the repository is unsigned, the home
+                    page says so, and foundation will not use it.
+  --releases FILE   the JSON of the GitHub releases (what `gh api repos/OWNER/NAME/releases` returns) for the version tables.
+  --repo OWNER/NAME fetch that JSON with the `gh` command instead.
+  --base-url URL    where the site will be served (default https://packages.ersa.dev); used in ersa.repo.
+  --cname DOMAIN    write a CNAME file for GitHub Pages.
+"""
+
+import argparse
+import datetime
+import html
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import mdhtml  # noqa: E402
+
+ROOT = os.path.dirname(HERE)
+SOURCE_REPO = "Ersa-ECPX/packages"
+RPM_NAME = re.compile(r"^(?P<name>.+)-(?P<version>[^-]+)-(?P<release>[^-]+)\.(?P<arch>[A-Za-z0-9_]+)\.rpm$")
+DOC_PAGES = (("index", "Overview"), ("using", "Use the repository"), ("publishing", "Publishing"), ("building", "Building"))
+
+
+# -- the specs ---------------------------------------------------------------------------------
+
+def expand(text, macros):
+    """Replace %{name} style macros we know; an unknown macro is left as it is."""
+    def one(match):
+        return macros.get(match.group(1), match.group(0))
+    for _ in range(4):
+        text = re.sub(r"%\{\??([A-Za-z0-9_]+)\}", lambda m: macros.get(m.group(1), "" if m.group(0).startswith("%{?") else m.group(0)), text)
+    return text
+
+
+def parse_spec(path):
+    """{"directory", "name", "version", "release", "license", "url", "packages": [{"name", "summary", "description"}]}."""
+    macros, tags, packages, current, section = {}, {}, [], None, None
+    with open(path, encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    for line in lines:
+        match = re.match(r"^%(?:global|define)\s+(\w+)\s+(.*)$", line)
+        if match:
+            macros[match.group(1)] = match.group(2).strip()
+    if "commit" in macros:
+        macros["shortcommit"] = macros["commit"][:7]          # the spec computes it with a shell command
+    for line in lines:
+        header = re.match(r"^%package\s+(?:-n\s+)?(\S+)", line)
+        if header:
+            current = {"name": header.group(1), "summary": "", "description": []}
+            packages.append(current)
+            section = "package"
+            continue
+        described = re.match(r"^%description(?:\s+(?:-n\s+)?(\S+))?\s*$", line)
+        if described:
+            wanted = described.group(1)
+            current = next((p for p in packages if p["name"] == wanted), None) if wanted else packages[0] if packages else None
+            section = "description"
+            continue
+        if line.startswith("%") and not line.startswith("%%") and section == "description":
+            section = None
+            continue
+        if section == "description" and current is not None:
+            current["description"].append(line)
+            continue
+        tag = re.match(r"^(Name|Version|Release|Summary|License|URL):\s*(.*)$", line)
+        if tag:
+            key, value = tag.group(1).lower(), tag.group(2).strip()
+            if section == "package" and current is not None:
+                if key == "summary":
+                    current["summary"] = value
+            elif key not in tags:
+                tags[key] = value
+                if key == "name":
+                    macros["name"] = value
+                if key == "version":
+                    macros["version"] = value
+                if key == "url":
+                    macros["url"] = value
+                if key == "name":
+                    packages.insert(0, {"name": value, "summary": "", "description": []})
+                    current = packages[0]
+                    section = None
+    main = tags.get("name", os.path.basename(os.path.dirname(path)))
+    for package in packages:
+        if package["name"] == main and not package["summary"]:
+            package["summary"] = tags.get("summary", "")
+    result = {"directory": os.path.basename(os.path.dirname(path)), "name": main,
+              "version": expand(tags.get("version", ""), macros), "release": expand(tags.get("release", ""), macros),
+              "license": expand(tags.get("license", ""), macros), "url": expand(tags.get("url", ""), macros), "packages": []}
+    for package in packages:
+        text = " ".join(" ".join(package["description"]).split())
+        name = expand(package["name"], macros)
+        if name.startswith("%"):
+            continue
+        result["packages"].append({"name": name, "summary": expand(package["summary"], macros),
+                                   "description": expand(text, macros)})
+    return result
+
+
+def load_specs(root=ROOT):
+    found = []
+    for directory in sorted(os.listdir(root)):
+        path = os.path.join(root, directory)
+        if not os.path.isdir(path):
+            continue
+        for name in sorted(os.listdir(path)):
+            if name.endswith(".spec"):
+                found.append(parse_spec(os.path.join(path, name)))
+    return found
+
+
+# -- releases and rpm files --------------------------------------------------------------------
+
+def split_rpm(filename):
+    """{"name", "version", "release", "arch"} of an RPM file name, or None (also for source and debug packages)."""
+    match = RPM_NAME.match(filename)
+    if not match or match.group("arch") == "src" or re.search(r"-(debuginfo|debugsource)$", match.group("name")):
+        return None
+    return match.groupdict()
+
+
+def load_releases(path=None, repo=None):
+    if path:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, list) else data.get("releases", [])
+    if repo:
+        done = subprocess.run(["gh", "api", f"repos/{repo}/releases", "--paginate", "--jq", ".[]"], capture_output=True, text=True)
+        if done.returncode != 0:
+            sys.exit(f"gh could not list the releases of {repo}: {done.stderr.strip()}")
+        return [json.loads(line) for line in done.stdout.splitlines() if line.strip()]
+    return []
+
+
+def versions_by_package(releases):
+    """{package name: [{"version", "release", "arch", "tag", "date", "url", "size"}]}, newest release first."""
+    found = {}
+    ordered = sorted((r for r in releases if not r.get("draft")), key=lambda r: r.get("published_at") or "", reverse=True)
+    for release in ordered:
+        for asset in release.get("assets", []):
+            parts = split_rpm(asset.get("name", ""))
+            if parts:
+                found.setdefault(parts["name"], []).append({
+                    **parts, "tag": release.get("tag_name", ""), "date": (release.get("published_at") or "")[:10],
+                    "url": asset.get("browser_download_url", ""), "size": asset.get("size", 0),
+                    "prerelease": bool(release.get("prerelease"))})
+    return found
+
+
+def repository_contents(directory):
+    """{package name: {"version", "release", "arch", "file", "size"}} of the RPMs in a repository folder."""
+    found = {}
+    if not os.path.isdir(directory):
+        return found
+    for filename in sorted(os.listdir(directory)):
+        parts = split_rpm(filename)
+        if parts:
+            found[parts["name"]] = {**parts, "file": filename, "size": os.path.getsize(os.path.join(directory, filename))}
+    return found
+
+
+def size(number):
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if number < 1024 or unit == "GiB":
+            return f"{number:.0f} {unit}" if unit == "B" else f"{number:.1f} {unit}"
+        number /= 1024
+
+
+# -- the repository ----------------------------------------------------------------------------
+
+def build_repository(rpms, output, signing):
+    """Copy the RPMs into output/repo, make the metadata, sign when a key is given. Returns a dict about what happened."""
+    repo = os.path.join(output, "repo")
+    os.makedirs(repo, exist_ok=True)
+    count = 0
+    for filename in sorted(os.listdir(rpms)):
+        if filename.endswith(".rpm") and not filename.endswith(".src.rpm") and not re.search(r"-(debuginfo|debugsource)-", filename):
+            shutil.copy2(os.path.join(rpms, filename), repo)
+            count += 1
+    info = {"rpms": count, "metadata": False, "signed": False, "fingerprint": ""}
+    if not count:
+        return info
+    if not shutil.which("createrepo_c"):
+        print("warning: createrepo_c is not installed; the RPMs are copied but the repository has no metadata", file=sys.stderr)
+        return info
+    if signing:
+        info.update(sign_rpms(repo, output))
+    subprocess.run(["createrepo_c", "--general-compress-type=gz", repo], check=True, capture_output=True)
+    info["metadata"] = True
+    if signing:
+        sign_metadata(repo, info)
+    return info
+
+
+def gpg_home(work):
+    home = os.path.join(work, "gnupg")
+    os.makedirs(home, mode=0o700, exist_ok=True)
+    with open(os.path.join(home, "gpg-agent.conf"), "w", encoding="utf-8") as handle:
+        handle.write("allow-loopback-pinentry\n")
+    return home
+
+
+def signing_state():
+    """Import the key from the environment into a private GnuPG home. Returns {"home", "keyid", "options"} or None."""
+    key = os.environ.get("GPG_PRIVATE_KEY")
+    if not key:
+        return None
+    work = tempfile.mkdtemp(prefix="site-gpg.")
+    home = gpg_home(work)
+    env = {**os.environ, "GNUPGHOME": home}
+    subprocess.run(["gpg", "--batch", "--import"], input=key.encode(), check=True, capture_output=True, env=env)
+    listing = subprocess.run(["gpg", "--batch", "--list-secret-keys", "--with-colons"], check=True, capture_output=True,
+                             text=True, env=env).stdout
+    keyid = next(line.split(":")[9] for line in listing.splitlines() if line.startswith("fpr:"))
+    passphrase = os.path.join(work, "passphrase")
+    with open(passphrase, "w", encoding="utf-8") as handle:
+        handle.write(os.environ.get("GPG_PASSPHRASE", ""))
+    os.chmod(passphrase, 0o600)
+    return {"home": home, "keyid": keyid, "work": work, "env": env,
+            "options": ["--batch", "--pinentry-mode", "loopback", "--passphrase-file", passphrase]}
+
+
+def sign_rpms(repo, output):
+    state = SIGNING
+    armored = subprocess.run(["gpg", "--batch", "--armor", "--export", state["keyid"]], check=True, capture_output=True,
+                             env=state["env"]).stdout
+    with open(os.path.join(output, "ersa-ecpx.asc"), "wb") as handle:
+        handle.write(armored)
+    # rpm changed how the signing command is written: 4.x names the files with macros and repeats the program name, newer
+    # versions pass them as positional arguments. Ask the installed rpm which one it uses.
+    shown = subprocess.run(["rpm", "--eval", "%__gpg_sign_cmd"], capture_output=True, text=True).stdout
+    options = " ".join(state["options"]) + " --no-verbose --no-armor --no-secmem-warning -u \"%{_gpg_name}\" --digest-algo sha256"
+    if "%{2}" in shown:
+        macro, sign_command = "__gpg_sign_cmd()", f"%{{__gpg}} {options} -sbo %{{2}} -- %{{1}}"       # a macro with arguments
+    else:
+        macro, sign_command = "__gpg_sign_cmd", f"%{{__gpg}} gpg {options} -sbo %{{__signature_filename}} %{{__plaintext_filename}}"
+    rpms = [os.path.join(repo, f) for f in sorted(os.listdir(repo)) if f.endswith(".rpm")]
+    done = subprocess.run(["rpmsign", "--define", f"_gpg_name {state['keyid']}", "--define", f"{macro} {sign_command}",
+                           "--addsign", *rpms], capture_output=True, text=True, env=state["env"])
+    if done.returncode != 0:
+        sys.exit("rpmsign failed: " + (done.stderr or done.stdout).strip()[-500:])
+    return {"signed": True, "fingerprint": state["keyid"]}
+
+
+def sign_metadata(repo, info):
+    state = SIGNING
+    subprocess.run(["gpg", *state["options"], "--local-user", state["keyid"], "--detach-sign", "--armor", "-o",
+                    os.path.join(repo, "repodata", "repomd.xml.asc"), os.path.join(repo, "repodata", "repomd.xml")],
+                   check=True, capture_output=True, env=state["env"])
+
+
+SIGNING = None
+
+
+# -- pages -------------------------------------------------------------------------------------
+
+CSS = """
+:root{color-scheme:light dark;--bg:#fff;--fg:#1d1d1f;--mut:#5f6368;--line:#e3e3e8;--acc:#1c6dd0;--card:#f7f7f9;--warn:#fff4d6;--warnfg:#6b4a00}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--fg:#ececf0;--mut:#9aa0a6;--line:#2c2c31;--acc:#6aa9ff;--card:#1c1c20;--warn:#3a2f10;--warnfg:#f3d98a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--acc)}header{border-bottom:1px solid var(--line)}
+.bar{max-width:60rem;margin:0 auto;padding:.9rem 1rem;display:flex;gap:1.25rem;flex-wrap:wrap;align-items:baseline}
+.bar b{font-size:1.05rem}.bar a{color:var(--mut);text-decoration:none}.bar a.on{color:var(--fg);font-weight:600}
+main{max-width:60rem;margin:0 auto;padding:1rem 1rem 4rem}h1{line-height:1.2}h2{margin-top:2rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}
+code{background:var(--card);padding:.1em .35em;border-radius:4px;font-size:.92em}pre{background:var(--card);padding:.9rem;border-radius:8px;overflow:auto}
+pre{position:relative}pre code{background:none;padding:0}
+.copy{position:absolute;top:.5rem;right:.5rem;font:inherit;font-size:.8rem;padding:.15rem .55rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--mut);cursor:pointer}
+.copy:hover{color:var(--fg)}pre code{display:block;padding-right:4rem}.table{overflow:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:.9rem}blockquote{margin:1rem 0;padding:.6rem 1rem;background:var(--warn);color:var(--warnfg);border-radius:8px}
+blockquote p{margin:.3rem 0}.note{background:var(--card);border-radius:8px;padding:.7rem 1rem;margin:1rem 0}.warn{background:var(--warn);color:var(--warnfg)}
+footer{max-width:60rem;margin:0 auto;padding:1rem;color:var(--mut);font-size:.9rem;border-top:1px solid var(--line)}
+"""
+
+
+SCRIPT = ("<script>document.querySelectorAll('.copy').forEach(function(b){b.addEventListener('click',function(){"
+          "var t=b.parentNode.querySelector('code').textContent;"
+          "(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){b.textContent='Copied'},"
+          "function(){b.textContent='Select and copy'});setTimeout(function(){b.textContent='Copy'},1500)})})</script>")
+
+
+def layout(title, body, active, stamp):
+    nav = "".join(f'<a href="{href}"{" class=on" if key == active else ""}>{html.escape(label)}</a>' for key, href, label in
+                  [("index", "index.html", "Packages"), ("using", "using.html", "Use the repository"),
+                   ("publishing", "publishing.html", "Publishing"), ("building", "building.html", "Building"),
+                   ("source", f"https://github.com/{SOURCE_REPO}", "Source")])
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f"<title>{html.escape(title)} | Ersa Compute Platform packages</title><style>{CSS}</style></head><body>"
+            f'<header><div class="bar"><b>Ersa Compute Platform packages</b>{nav}</div></header><main>{body}</main>'
+            f"<footer>{html.escape(stamp)}</footer>{SCRIPT}</body></html>")
+
+
+def render_markdown(text, name_pages):
+    def resolve(target):
+        base = target.split("#")[0]
+        if base.endswith(".md") and os.path.basename(base)[:-3] in name_pages:
+            return os.path.basename(base)[:-3] + ".html" + ("#" + target.split("#", 1)[1] if "#" in target else "")
+        if target.startswith("#") or target.endswith((".html", "/")) or "/" not in target and "." not in target:
+            return target
+        return target if base.endswith((".html", "/")) else None
+    return mdhtml.Converter(resolve).convert(text)
+
+
+def package_table(specs, repo, versions):
+    rows = []
+    for spec in specs:
+        for package in spec["packages"]:
+            name = package["name"]
+            current = repo.get(name)
+            if current:
+                where = f"{current['version']}-{current['release']}"
+            elif versions.get(name):
+                latest = versions[name][0]
+                where = f"{latest['version']}-{latest['release']} (release {latest['tag']})"
+            else:
+                where = "not published yet"
+            rows.append(f'<tr><td><a href="packages/{html.escape(name)}.html"><code>{html.escape(name)}</code></a></td>'
+                        f"<td>{html.escape(package['summary'])}</td><td>{html.escape(where)}</td></tr>")
+    return ('<div class="table"><table><thead><tr><th>Package</th><th>What it is</th><th>Version available</th></tr></thead><tbody>'
+            + "".join(rows) + "</tbody></table></div>")
+
+
+def repository_notice(info, base):
+    if not info["rpms"]:
+        return ('<div class="note warn"><b>The repository is empty.</b> Nothing has been published yet, so the addresses on '
+                "<a href=using.html>the next page</a> do not work yet.</div>")
+    if not info["metadata"]:
+        return '<div class="note warn"><b>Not usable yet:</b> the RPMs are here but the repository metadata was not made.</div>'
+    if not info["signed"]:
+        return ('<div class="note warn"><b>This repository is not signed.</b> <code>foundation</code> and a default '
+                "<code>zypper</code> setup refuse an unsigned repository. It is published like this only until a signing key exists.</div>")
+    return (f'<div class="note"><b>Signed repository.</b> Key fingerprint: <code>{html.escape(info["fingerprint"])}</code>. '
+            f'Repository address: <code>{html.escape(base)}/repo/</code></div>')
+
+
+def package_page(spec, package, versions, repo):
+    name = package["name"]
+    lines = [f"# {name}", "", package["summary"] or "", "", package["description"] or "", ""]
+    licence = spec["license"]
+    licence = "not decided yet" if not licence or "Unknown" in licence else licence
+    lines += ["## Install", "", "```", f"sudo zypper install {name}", "```", "",
+              "This needs the repository set up as described on [using the repository](using.md).", ""]
+    lines += ["## Details", "", f"- **Licence:** {licence}"]
+    if spec["url"]:
+        lines.append(f"- **Project:** [{spec['url']}]({spec['url']})")
+    lines.append(f"- **Spec:** [{spec['directory']}/]({'https://github.com/' + SOURCE_REPO + '/tree/main/' + spec['directory']})")
+    lines.append("")
+    lines += ["## Versions", ""]
+    found = versions.get(name, [])
+    if not found:
+        lines += ["No release contains this package yet.", ""]
+    else:
+        lines += ["| Version | Architecture | Released | File |", "|---|---|---|---|"]
+        for item in found:
+            file_name = f"{name}-{item['version']}-{item['release']}.{item['arch']}.rpm"
+            lines.append(f"| {item['version']}-{item['release']}{' (pre-release)' if item['prerelease'] else ''} | {item['arch']} | "
+                         f"{item['date']} | [{file_name}]({item['url']}) ({size(item['size'])}) |")
+        lines.append("")
+    if name in repo:
+        lines += [f"The repository currently serves **{repo[name]['version']}-{repo[name]['release']}**.", ""]
+    return "\n".join(lines)
+
+
+def build(output, rpms=None, releases=None, base="https://packages.ersa.dev", cname=""):
+    global SIGNING
+    SIGNING = signing_state() if rpms else None
+    if os.path.exists(output):
+        shutil.rmtree(output)
+    os.makedirs(output)
+    specs = load_specs()
+    info = build_repository(rpms, output, SIGNING) if rpms else {"rpms": 0, "metadata": False, "signed": False, "fingerprint": ""}
+    repo = repository_contents(os.path.join(output, "repo"))
+    versions = versions_by_package(releases or [])
+    stamp = "Generated " + datetime.date.today().isoformat()
+    try:
+        commit = subprocess.run(["git", "-C", ROOT, "log", "-1", "--format=%h"], capture_output=True, text=True).stdout.strip()
+        stamp += f" from commit {commit}" if commit else ""
+    except OSError:
+        pass
+    pages = {key for key, _label in DOC_PAGES}
+    for key, label in DOC_PAGES:
+        with open(os.path.join(ROOT, "docs", key + ".md"), encoding="utf-8") as handle:
+            body = render_markdown(handle.read(), pages)
+        if key == "index":
+            body += repository_notice(info, base) + '<h2 id="packages">Packages</h2>' + package_table(specs, repo, versions)
+        with open(os.path.join(output, key + ".html"), "w", encoding="utf-8") as handle:
+            handle.write(layout(label, body, key if key != "index" else "index", stamp))
+    os.makedirs(os.path.join(output, "packages"))
+    for spec in specs:
+        for package in spec["packages"]:
+            body = render_markdown(package_page(spec, package, versions, repo), pages).replace('href="using.html"', 'href="../using.html"')
+            page = layout(package["name"], body, "index", stamp).replace('href="index.html"', 'href="../index.html"')
+            for key, _label in DOC_PAGES[1:]:
+                page = page.replace(f'href="{key}.html"', f'href="../{key}.html"')
+            with open(os.path.join(output, "packages", package["name"] + ".html"), "w", encoding="utf-8") as handle:
+                handle.write(page)
+    with open(os.path.join(output, "ersa.repo"), "w", encoding="utf-8") as handle:
+        handle.write(f"[ersa]\nname=Ersa Compute Platform packages\nenabled=1\nbaseurl={base}/repo/\ngpgcheck=1\nrepo_gpgcheck=1\n"
+                     f"gpgkey={base}/ersa-ecpx.asc\n")
+    open(os.path.join(output, ".nojekyll"), "w", encoding="utf-8").close()
+    if cname:
+        with open(os.path.join(output, "CNAME"), "w", encoding="utf-8") as handle:
+            handle.write(cname + "\n")
+    return {"specs": specs, "repository": info, "versions": versions}
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="Build the packages site.")
+    parser.add_argument("output")
+    parser.add_argument("--rpms")
+    parser.add_argument("--releases")
+    parser.add_argument("--repo")
+    parser.add_argument("--cname", default="")
+    parser.add_argument("--base-url", default="https://packages.ersa.dev")
+    args = parser.parse_args(argv)
+    result = build(os.path.abspath(args.output), args.rpms, load_releases(args.releases, args.repo), args.base_url.rstrip("/"), args.cname)
+    count = sum(len(spec["packages"]) for spec in result["specs"])
+    info = result["repository"]
+    state = "empty" if not info["rpms"] else ("signed" if info["signed"] else "UNSIGNED") if info["metadata"] else "no metadata"
+    print(f"wrote {args.output}: {count} package pages, repository {state} ({info['rpms']} RPMs)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

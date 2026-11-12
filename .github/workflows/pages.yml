@@ -1,0 +1,75 @@
+# Publishes https://packages.ersa.dev : the documentation, a page per package and the current RPM repository.
+#
+# It builds nothing. The RPMs are built in a container on a developer's machine (scripts/build-repo-podman) and attached to a
+# GitHub release with scripts/release-rpms; publishing that release runs this workflow, which downloads the release's RPMs, signs
+# them and the repository metadata (when the secrets exist), and deploys the result with GitHub Pages. See docs/publishing.md.
+#
+# One-time setup (nothing here has run yet): Settings > Pages > Source "GitHub Actions" and the custom domain packages.ersa.dev
+# (DNS: CNAME packages -> ersa-ecpx.github.io); secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE from scripts/make-signing-key. Without
+# the secrets the site is published with an UNSIGNED repository and says so.
+name: Publish packages site
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (default: the newest release)"
+        required: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    env:
+      HAS_KEY: ${{ secrets.GPG_PRIVATE_KEY != '' && '1' || '0' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends createrepo-c rpm gnupg
+
+      - name: Download the RPMs of the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if [ -z "$TAG" ]; then
+            TAG="$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')"
+          fi
+          [ -n "$TAG" ] || { echo "there is no release to publish" >&2; exit 1; }
+          echo "publishing the release $TAG"
+          mkdir rpms
+          gh release download "$TAG" --pattern '*.rpm' --dir rpms
+
+      - name: Build the site and the repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: scripts/build-site site --rpms rpms --repo "$GITHUB_REPOSITORY" --cname packages.ersa.dev
+
+      - name: Check the signature (signed builds only)
+        if: ${{ env.HAS_KEY == '1' }}
+        run: |
+          gpg --batch --import site/ersa-ecpx.asc
+          gpg --batch --verify site/repo/repodata/repomd.xml.asc site/repo/repodata/repomd.xml
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

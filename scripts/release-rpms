@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Create a GitHub release and attach the RPMs of a build to it. Publishing the release starts the workflow that publishes the
+# site (.github/workflows/pages.yml); a draft does not, so use --draft to look at it first.
+#
+#   scripts/release-rpms TAG DIR [--draft] [--repo OWNER/NAME]
+#
+#   TAG    the release name, for example r20261112 (letters, digits, dots, dashes)
+#   DIR    a folder with the RPMs (the output of scripts/build-repo-podman, or mkosi.packages/ of ecp-mkosi); debuginfo and
+#          debugsource packages are left out
+#
+# Needs the `gh` command, logged in with a token that may create releases. UNTESTED: it has not been run against GitHub.
+set -euo pipefail
+usage() { echo "usage: scripts/release-rpms TAG DIR [--draft] [--repo OWNER/NAME]" >&2; exit 2; }
+[[ $# -ge 2 ]] || usage
+tag="$1"; dir="$2"; shift 2
+draft=(); repo="Ersa-ECPX/packages"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --draft) draft=(--draft) ;;
+    --repo) repo="${2:?--repo needs OWNER/NAME}"; shift ;;
+    *) usage ;;
+  esac
+  shift
+done
+[[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "the tag may only have letters, digits, dots and dashes" >&2; exit 2; }
+[[ -d "$dir" ]] || { echo "$dir is not a folder" >&2; exit 2; }
+command -v gh >/dev/null || { echo "the gh command is required" >&2; exit 1; }
+
+files=()
+while IFS= read -r file; do files+=("$file"); done < <(find "$dir" -maxdepth 1 -name '*.rpm' ! -name '*-debuginfo-*' ! -name '*-debugsource-*' | sort)
+[[ ${#files[@]} -gt 0 ]] || { echo "no RPMs in $dir" >&2; exit 1; }
+
+notes="RPMs for openSUSE Tumbleweed:"$'\n\n'
+for file in "${files[@]}"; do notes+="- $(basename "$file")"$'\n'; done
+notes+=$'\n'"Published at https://packages.ersa.dev once this release is public."
+
+printf 'Release %s on %s with %d files:\n' "$tag" "$repo" "${#files[@]}"
+printf '  %s\n' "${files[@]##*/}"
+gh release create "$tag" "${files[@]}" --repo "$repo" --title "Packages $tag" --notes "$notes" "${draft[@]}"

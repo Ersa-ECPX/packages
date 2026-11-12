@@ -35,15 +35,27 @@ foundation refuses to use it (`foundation` requires a valid detached signature o
 Releasing a new `foundation`: tag `v<Version>` in the `foundation` repository, bump `Version:` and `Release:` in
 `foundation/foundation.spec` here, push. A compiled package is updated by changing its pinned `%global commit`.
 
-## Publishing (workflow, untested)
+## Publishing: packages.ersa.dev (planned, not yet run)
 
-`.github/workflows/build-rpms.yml` builds on every push and pull request, and on pushes to `main` and `v*` tags
-pushes the result to the `gh-pages` branch (served at `https://ersa-ecpx.github.io/packages/`). It has **never run**
-on GitHub: see the comments at its top for what is verified, the secrets (`GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`; no
-signing key exists yet) and the manual steps (enable Pages for the `gh-pages` branch; the tag `v0.5.0` of
-`foundation` must exist; the source repositories must be readable). Each publish replaces the branch, so only the
-latest RPMs are served.
+The packages are published at **https://packages.ersa.dev** (GitHub Pages): the documentation, a page for each package and
+the current signed RPM repository. Each upload is also kept as a GitHub release with its files, so every older version stays
+downloadable and the package pages link them. Nothing is built on GitHub: you build in the container, then
 
-The published `ersa.repo` file is a zypp/dnf repository definition with `gpgcheck=1` and `repo_gpgcheck=1`.
-The image build (`ecp-mkosi`) does not use this repository yet: it builds the same packages into its local
-`mkosi.packages/` directory (see that repository's README).
+```sh
+scripts/build-repo-podman repo            # or use the RPMs an image build made (ecp-mkosi: mkosi.packages/)
+scripts/release-rpms r20261112 repo       # create the release and attach the RPMs (--draft to look first)
+```
+
+Publishing the release starts `.github/workflows/pages.yml`, which downloads its RPMs, signs them and the repository metadata
+and deploys the site. The setup (Pages source, DNS, the signing key from `scripts/make-signing-key`) and the limits are in
+[docs/publishing.md](docs/publishing.md); `scripts/build-site OUTPUT` builds the same site locally (`--rpms DIR` to include a
+repository). Tested so far: the site generator and its tests, the signing of RPMs with a throwaway key (rpm 6). Not run: anything
+on GitHub, `createrepo_c`, the older rpm signing path (Tumbleweed, Ubuntu), and a client using the repository.
+
+The repository file `ersa.repo` it publishes turns on `gpgcheck=1` and `repo_gpgcheck=1`. The image build (`ecp-mkosi`) does not
+use this repository yet: it builds the same packages into its local `mkosi.packages/` directory.
+
+`.github/workflows/build-rpms.yml` is the earlier idea (build everything on GitHub's runners); it stays manual-only because the
+openSUSE mirror served an incomplete index to the runner.
+
+Tests: `python3 -m unittest discover -s tests`.

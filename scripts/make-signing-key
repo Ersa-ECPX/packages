@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Make the key that signs the package repository, and say what to do with it. Nothing is uploaded anywhere.
+#
+#   scripts/make-signing-key [OUTPUT_DIR]        default: ./signing-key (keep it OUT of the git repository)
+#
+# It writes into OUTPUT_DIR:
+#   ersa-ecpx.asc          the PUBLIC key: published on the site, and what foundation and zypper check signatures against
+#   secret-key.asc         the SECRET key: goes into the repository secret GPG_PRIVATE_KEY, nowhere else; delete it afterwards
+#   passphrase.txt         its passphrase: goes into the repository secret GPG_PASSPHRASE
+# and prints the fingerprint. Keep a backup of secret-key.asc and the passphrase somewhere safe (a password manager): if the key
+# is lost, every system that trusts it has to be told about a new one.
+set -euo pipefail
+out="${1:-signing-key}"
+command -v gpg >/dev/null || { echo "gpg is required" >&2; exit 1; }
+[[ ! -e "$out" ]] || { echo "$out already exists; choose another folder or remove it" >&2; exit 1; }
+umask 077
+mkdir -p "$out"
+home="$(mktemp -d)"
+trap 'rm -rf "$home"' EXIT
+export GNUPGHOME="$home"
+passphrase="$(head -c 24 /dev/urandom | base64 | tr -d '/+=' | head -c 32)"
+printf '%s' "$passphrase" > "$out/passphrase.txt"
+cat > "$home/params" <<P
+%echo making the signing key
+Key-Type: RSA
+Key-Length: 4096
+Key-Usage: sign
+Name-Real: Ersa Compute Platform packages
+Name-Email: packages@ersa.dev
+Expire-Date: 0
+Passphrase: $passphrase
+%commit
+P
+gpg --batch --quiet --generate-key "$home/params"
+fingerprint="$(gpg --batch --list-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')"
+gpg --batch --armor --export "$fingerprint" > "$out/ersa-ecpx.asc"
+gpg --batch --pinentry-mode loopback --passphrase "$passphrase" --armor --export-secret-keys "$fingerprint" > "$out/secret-key.asc"
+cat <<M
+
+Key made: $fingerprint
+
+Now, from a folder of the packages repository:
+  gh secret set GPG_PRIVATE_KEY < $out/secret-key.asc
+  gh secret set GPG_PASSPHRASE  < $out/passphrase.txt
+Then back up $out/secret-key.asc and $out/passphrase.txt and delete the files here. The public key is $out/ersa-ecpx.asc
+(the site publishes it itself); write the fingerprint above wherever people will want to check it.
+M
