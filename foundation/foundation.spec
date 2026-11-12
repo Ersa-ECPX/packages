@@ -124,6 +124,9 @@ install -Dpm0644 data/repos.d/opensuse-oss.repo %{buildroot}/usr/lib/foundation/
 install -Dpm0644 data/repos.d/packman-essentials.repo %{buildroot}/usr/lib/foundation/repos.d/packman-essentials.repo
 install -Dpm0644 data/keys/opensuse.asc %{buildroot}/usr/share/foundation/keys/opensuse.asc
 install -Dpm0644 data/keys/packman.asc %{buildroot}/usr/share/foundation/keys/packman.asc
+# the keys system image updates are verified with (scripts/make-image-signing-key in ecp-mkosi makes one; with none here,
+# updates can only be installed with --unsigned)
+for key in data/keys/ersa-image-*.asc; do [ -e "$key" ] || continue; install -Dpm0644 "$key" %{buildroot}/usr/share/foundation/keys/$(basename "$key"); done
 install -Dpm0644 data/catalog.d/codecs.json %{buildroot}/usr/lib/foundation/catalog.d/codecs.json
 install -Dpm0644 data/post-merge.d/10-gsettings.json %{buildroot}/usr/lib/foundation/post-merge.d/10-gsettings.json
 install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
