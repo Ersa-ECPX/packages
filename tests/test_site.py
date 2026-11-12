@@ -130,6 +130,19 @@ class Pages(unittest.TestCase):
         self.assertIn('href="https://x.y"', html)
         self.assertIn("filelink", html)        # a link to a source file is shown as text
 
+    def test_the_wiki_links_appear_only_when_asked_for_and_work_from_package_pages(self):
+        plain, with_wiki = os.path.join(self.out, "a"), os.path.join(self.out, "b")
+        site.build(plain)
+        site.build(with_wiki, wiki=True)
+        with open(os.path.join(plain, "index.html")) as handle:
+            self.assertNotIn("wiki/", handle.read())
+        with open(os.path.join(with_wiki, "index.html")) as handle:
+            index = handle.read()
+        self.assertIn('href="wiki/api/"', index)
+        self.assertIn('<a href="wiki/">Wiki</a>', index)
+        with open(os.path.join(with_wiki, "packages", "foundation.html")) as handle:
+            self.assertIn('href="../wiki/"', handle.read())
+
     def test_the_repo_file_points_at_the_base_url(self):
         output = os.path.join(self.out, "site")
         site.build(output, base="https://packages.example.org")

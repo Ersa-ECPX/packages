@@ -35,10 +35,10 @@ foundation refuses to use it (`foundation` requires a valid detached signature o
 Releasing a new `foundation`: tag `v<Version>` in the `foundation` repository, bump `Version:` and `Release:` in
 `foundation/foundation.spec` here, push. A compiled package is updated by changing its pinned `%global commit`.
 
-## Publishing: packages.ersa.dev (planned, not yet run)
+## Publishing: pkgs-compute.ersa.dev (planned, not yet run)
 
-The packages are published at **https://packages.ersa.dev** (GitHub Pages): the documentation, a page for each package and
-the current signed RPM repository. Each upload is also kept as a GitHub release with its files, so every older version stays
+The packages are published at **https://pkgs-compute.ersa.dev** (GitHub Pages): a page for each package, the current signed RPM
+repository, the platform wiki at `/wiki/` and the C++ API reference at `/wiki/api/` (the same layout as pkgs-wearables.ersa.dev). Each upload is also kept as a GitHub release with its files, so every older version stays
 downloadable and the package pages link them. Nothing is built on GitHub: you build in the container, then
 
 ```sh

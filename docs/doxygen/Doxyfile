@@ -1,0 +1,37 @@
+# C++ API reference of the Ersa Compute Platform's compiled components (ersa-bluetooth and the Dialer), served at /wiki/api/.
+# The workflow (.github/workflows/pages.yml) fetches the sources at the commits the specs pin into $(DOX_SOURCES) and sets
+# $(DOX_OUTPUT); to build it yourself:
+#   mkdir -p /tmp/dox && git -C /tmp/dox clone https://github.com/Ersa-ECPX/ersa-bluetooth && git -C /tmp/dox clone https://github.com/Ersa-ECPX/Dialer dialer
+#   DOX_SOURCES=/tmp/dox DOX_OUTPUT=/tmp/dox-out doxygen docs/doxygen/Doxyfile
+# The code has no Doxygen comments yet, so the reference shows structure (files, classes, who includes whom) and the Markdown
+# documents, not prose; EXTRACT_ALL is on for that reason. Comments written as /// or /** */ are picked up as they appear.
+PROJECT_NAME           = "Ersa Compute Platform: C++ components"
+PROJECT_BRIEF          = "ersa-bluetooth (the Bluetooth bridge) and the Dialer"
+OUTPUT_DIRECTORY       = $(DOX_OUTPUT)
+HTML_OUTPUT            = .
+CREATE_SUBDIRS         = NO
+INPUT                  = $(DOX_SOURCES)/ersa-bluetooth $(DOX_SOURCES)/dialer
+FILE_PATTERNS          = *.h *.hpp *.cc *.cpp *.md
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */build/* */.git/* */tests/*
+USE_MDFILE_AS_MAINPAGE = $(DOX_SOURCES)/ersa-bluetooth/README.md
+MARKDOWN_SUPPORT       = YES
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+SOURCE_BROWSER         = YES
+HAVE_DOT               = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+INCLUDE_GRAPH          = YES
+DOT_IMAGE_FORMAT       = svg
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_NO_PARAMDOC       = NO
+WARN_AS_ERROR          = NO

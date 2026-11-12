@@ -12,8 +12,8 @@ The image has the platform's packages already. To follow updates between images,
 checks the key's fingerprint with you first:
 
 ```
-curl -LO https://packages.ersa.dev/ersa-ecpx.asc
-foundation repo add ersa https://packages.ersa.dev/repo/ --key ersa-ecpx.asc --name "Ersa Compute Platform packages"
+curl -LO https://pkgs-compute.ersa.dev/ersa-ecpx.asc
+foundation repo add ersa https://pkgs-compute.ersa.dev/repo/ --key ersa-ecpx.asc --name "Ersa Compute Platform packages"
 foundation repo refresh ersa
 ```
 
@@ -23,9 +23,9 @@ platform's own documentation). The repository matters for bundles and for other 
 ## On another openSUSE Tumbleweed system
 
 ```
-curl -LO https://packages.ersa.dev/ersa-ecpx.asc
+curl -LO https://pkgs-compute.ersa.dev/ersa-ecpx.asc
 sudo rpm --import ersa-ecpx.asc
-sudo zypper addrepo --check --refresh https://packages.ersa.dev/ersa.repo
+sudo zypper addrepo --check --refresh https://pkgs-compute.ersa.dev/ersa.repo
 sudo zypper install foundation
 ```
 

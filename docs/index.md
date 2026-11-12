@@ -17,6 +17,8 @@ linked against the same libraries as the image it goes into.
 | --- | --- |
 | This site, [`/repo/`](repo/) | the **current** packages as an ordinary RPM repository, signed, for `zypper`, `dnf` and `foundation` |
 | [GitHub releases](https://github.com/Ersa-ECPX/packages/releases) | **every** upload with its files, so any earlier version can still be downloaded |
+| [The wiki](wiki/) | the platform's documentation: architecture, installer, foundation, updates, storage |
+| [C++ API reference](wiki/api/) | generated from the sources of `ersa-bluetooth` and the Dialer |
 | [The source](https://github.com/Ersa-ECPX/packages) | the RPM specs, patches and small sources |
 
 Start with [using the repository](using.md). The list below shows what is in it now.

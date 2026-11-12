@@ -32,7 +32,7 @@ while IFS= read -r file; do files+=("$file"); done < <(find "$dir" -maxdepth 1 -
 
 notes="RPMs for openSUSE Tumbleweed:"$'\n\n'
 for file in "${files[@]}"; do notes+="- $(basename "$file")"$'\n'; done
-notes+=$'\n'"Published at https://packages.ersa.dev once this release is public."
+notes+=$'\n'"Published at https://pkgs-compute.ersa.dev once this release is public."
 
 printf 'Release %s on %s with %d files:\n' "$tag" "$repo" "${#files[@]}"
 printf '  %s\n' "${files[@]##*/}"

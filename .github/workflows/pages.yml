@@ -1,10 +1,10 @@
-# Publishes https://packages.ersa.dev : the documentation, a page per package and the current RPM repository.
+# Publishes https://pkgs-compute.ersa.dev : the documentation, a page per package and the current RPM repository.
 #
 # It builds nothing. The RPMs are built in a container on a developer's machine (scripts/build-repo-podman) and attached to a
 # GitHub release with scripts/release-rpms; publishing that release runs this workflow, which downloads the release's RPMs, signs
 # them and the repository metadata (when the secrets exist), and deploys the result with GitHub Pages. See docs/publishing.md.
 #
-# One-time setup (nothing here has run yet): Settings > Pages > Source "GitHub Actions" and the custom domain packages.ersa.dev
+# One-time setup (nothing here has run yet): Settings > Pages > Source "GitHub Actions" and the custom domain pkgs-compute.ersa.dev
 # (DNS: CNAME packages -> ersa-ecpx.github.io); secrets GPG_PRIVATE_KEY and GPG_PASSPHRASE from scripts/make-signing-key. Without
 # the secrets the site is published with an UNSIGNED repository and says so.
 name: Publish packages site
@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install the tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends createrepo-c rpm gnupg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends createrepo-c rpm gnupg doxygen graphviz
 
       - name: Download the RPMs of the release
         env:
@@ -59,7 +59,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: scripts/build-site site --rpms rpms --repo "$GITHUB_REPOSITORY" --cname packages.ersa.dev
+        run: scripts/build-site site --rpms rpms --repo "$GITHUB_REPOSITORY" --cname pkgs-compute.ersa.dev --wiki
+
+      # The wiki (/wiki/) is the platform's documentation: the Markdown of ecp-mkosi plus the foundation README, built by
+      # ecp-mkosi's own generator. The C++ API reference (/wiki/api/) is Doxygen over the sources the specs pin. Both are
+      # taken from the public repositories at publish time, so a release always carries current documentation.
+      - name: Build the wiki
+        run: |
+          git clone --depth 1 https://github.com/Ersa-ECPX/ecp-mkosi.git src/ecp-mkosi
+          git clone --depth 1 https://github.com/Ersa-ECPX/foundation.git src/ecp-mkosi/foundation
+          src/ecp-mkosi/scripts/build-wiki "$PWD/site/wiki/index.html"
+
+      - name: Build the C++ API reference
+        run: |
+          fetch() {   # fetch NAME REPOSITORY SPEC: the repository at the commit its spec pins
+            commit="$(sed -n 's/^%global commit[[:space:]]*//p' "$3" | head -n 1)"
+            git init -q "src/$1" && git -C "src/$1" fetch -q --depth 1 "https://github.com/Ersa-ECPX/$2.git" "$commit" \
+              && git -C "src/$1" checkout -q FETCH_HEAD
+          }
+          fetch ersa-bluetooth ersa-bluetooth ersa-bluetooth/ersa-bluetooth.spec
+          fetch dialer Dialer ersa-dialer/ersa-dialer.spec
+          mkdir -p site/wiki/api
+          DOX_SOURCES="$PWD/src" DOX_OUTPUT="$PWD/site/wiki/api" doxygen docs/doxygen/Doxyfile
 
       - name: Check the signature (signed builds only)
         if: ${{ env.HAS_KEY == '1' }}

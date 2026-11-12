@@ -13,8 +13,10 @@ the documents from docs/.
                     page says so, and foundation will not use it.
   --releases FILE   the JSON of the GitHub releases (what `gh api repos/OWNER/NAME/releases` returns) for the version tables.
   --repo OWNER/NAME fetch that JSON with the `gh` command instead.
-  --base-url URL    where the site will be served (default https://packages.ersa.dev); used in ersa.repo.
+  --base-url URL    where the site will be served (default https://pkgs-compute.ersa.dev); used in ersa.repo.
   --cname DOMAIN    write a CNAME file for GitHub Pages.
+  --wiki            link the platform wiki (/wiki/) and the C++ API reference (/wiki/api/) from the pages. They are built by the
+                    publish workflow after this script, into OUTPUT/wiki; leave the option off when they will not be there.
 """
 
 import argparse
@@ -295,10 +297,11 @@ SCRIPT = ("<script>document.querySelectorAll('.copy').forEach(function(b){b.addE
           "function(){b.textContent='Select and copy'});setTimeout(function(){b.textContent='Copy'},1500)})})</script>")
 
 
-def layout(title, body, active, stamp):
+def layout(title, body, active, stamp, wiki=False):
+    extra = [("wiki", "wiki/", "Wiki")] if wiki else []
     nav = "".join(f'<a href="{href}"{" class=on" if key == active else ""}>{html.escape(label)}</a>' for key, href, label in
                   [("index", "index.html", "Packages"), ("using", "using.html", "Use the repository"),
-                   ("publishing", "publishing.html", "Publishing"), ("building", "building.html", "Building"),
+                   ("publishing", "publishing.html", "Publishing"), ("building", "building.html", "Building"), *extra,
                    ("source", f"https://github.com/{SOURCE_REPO}", "Source")])
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f"<title>{html.escape(title)} | Ersa Compute Platform packages</title><style>{CSS}</style></head><body>"
@@ -377,7 +380,13 @@ def package_page(spec, package, versions, repo):
     return "\n".join(lines)
 
 
-def build(output, rpms=None, releases=None, base="https://packages.ersa.dev", cname=""):
+def documentation_links():
+    return ('<h2 id="documentation">Documentation</h2><ul>'
+            '<li><a href="wiki/">Platform wiki</a>: architecture, the installer, foundation, updates, storage and more</li>'
+            '<li><a href="wiki/api/">C++ API reference</a>: ersa-bluetooth and the Dialer</li></ul>')
+
+
+def build(output, rpms=None, releases=None, base="https://pkgs-compute.ersa.dev", cname="", wiki=False):
     global SIGNING
     SIGNING = signing_state() if rpms else None
     if os.path.exists(output):
@@ -399,13 +408,15 @@ def build(output, rpms=None, releases=None, base="https://packages.ersa.dev", cn
             body = render_markdown(handle.read(), pages)
         if key == "index":
             body += repository_notice(info, base) + '<h2 id="packages">Packages</h2>' + package_table(specs, repo, versions)
+            body += documentation_links() if wiki else ""
         with open(os.path.join(output, key + ".html"), "w", encoding="utf-8") as handle:
-            handle.write(layout(label, body, key if key != "index" else "index", stamp))
+            handle.write(layout(label, body, key if key != "index" else "index", stamp, wiki))
     os.makedirs(os.path.join(output, "packages"))
     for spec in specs:
         for package in spec["packages"]:
             body = render_markdown(package_page(spec, package, versions, repo), pages).replace('href="using.html"', 'href="../using.html"')
-            page = layout(package["name"], body, "index", stamp).replace('href="index.html"', 'href="../index.html"')
+            page = layout(package["name"], body, "index", stamp, wiki).replace('href="index.html"', 'href="../index.html"')
+            page = page.replace('href="wiki/"', 'href="../wiki/"')
             for key, _label in DOC_PAGES[1:]:
                 page = page.replace(f'href="{key}.html"', f'href="../{key}.html"')
             with open(os.path.join(output, "packages", package["name"] + ".html"), "w", encoding="utf-8") as handle:
@@ -427,9 +438,10 @@ def main(argv):
     parser.add_argument("--releases")
     parser.add_argument("--repo")
     parser.add_argument("--cname", default="")
-    parser.add_argument("--base-url", default="https://packages.ersa.dev")
+    parser.add_argument("--wiki", action="store_true")
+    parser.add_argument("--base-url", default="https://pkgs-compute.ersa.dev")
     args = parser.parse_args(argv)
-    result = build(os.path.abspath(args.output), args.rpms, load_releases(args.releases, args.repo), args.base_url.rstrip("/"), args.cname)
+    result = build(os.path.abspath(args.output), args.rpms, load_releases(args.releases, args.repo), args.base_url.rstrip("/"), args.cname, args.wiki)
     count = sum(len(spec["packages"]) for spec in result["specs"])
     info = result["repository"]
     state = "empty" if not info["rpms"] else ("signed" if info["signed"] else "UNSIGNED") if info["metadata"] else "no metadata"
