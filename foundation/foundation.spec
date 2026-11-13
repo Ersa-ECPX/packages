@@ -125,6 +125,9 @@ install -Dpm0755 data/libexec/foundationd %{buildroot}/usr/libexec/foundationd
 install -Dpm0755 data/libexec/foundationd-worker %{buildroot}/usr/libexec/foundationd-worker
 install -Dpm0755 data/libexec/foundation-bundles %{buildroot}/usr/libexec/foundation-bundles
 install -Dpm0755 data/libexec/foundation-update-notify %{buildroot}/usr/libexec/foundation-update-notify
+install -Dpm0755 data/libexec/foundation-autoupdate %{buildroot}/usr/libexec/foundation-autoupdate
+install -Dpm0644 data/systemd/foundation-autoupdate.service %{buildroot}/usr/lib/systemd/system/foundation-autoupdate.service
+install -Dpm0644 data/systemd/foundation-autoupdate.timer %{buildroot}/usr/lib/systemd/system/foundation-autoupdate.timer
 install -Dpm0755 data/libexec/foundation-splash-sync %{buildroot}/usr/libexec/foundation-splash-sync
 install -Dpm0644 data/systemd/foundation-bundles-select.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-select.service
 install -Dpm0644 data/systemd/foundation-bundles-refresh.service %{buildroot}/usr/lib/systemd/system/foundation-bundles-refresh.service
@@ -193,6 +196,9 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/system/foundation-bundles-refresh.service
 /usr/libexec/foundation-bundles
 /usr/libexec/foundation-update-notify
+/usr/libexec/foundation-autoupdate
+/usr/lib/systemd/system/foundation-autoupdate.service
+/usr/lib/systemd/system/foundation-autoupdate.timer
 /usr/lib/systemd/user/foundation-update-notify.service
 /usr/lib/systemd/user/foundation-update-notify.path
 /usr/libexec/foundation-splash-sync
@@ -205,6 +211,10 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 - Slots are named a and b; the version they hold is a separate field (GetSlots version, GetBootState running_version)
 - A waiting update is cleared once its version runs, so the notification stops
 - Updates.Restart: restart into an installed update under the same authorization as the install; the updates action is now kept by polkit
+- Updates.Check / Available / InstallLatest: the update source (ota.url) is read and the newest update downloaded by foundationd; the update window
+  and the command line are clients of it. New setting ota.auto_update (replaces ota.auto_download, which nothing used)
+- foundation-autoupdate.timer: about ten minutes after start and every six hours it checks, and installs only if ota.auto_update is on; a
+  desktop notification announces an update that is available. foundationd authorizes root without polkit (the service runs as root)
 - foundation_installer's D-Bus backend moved to foundation.gbackend (shared with the updater)
 * Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-1
 - Slots are dm-verity pairs (root and hash partition) with fixed labels, named by the root hash; one update archive format
