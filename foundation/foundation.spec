@@ -204,6 +204,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
   Install from a File in its menu; asks polkit through foundationd before installing
 - Slots are named a and b; the version they hold is a separate field (GetSlots version, GetBootState running_version)
 - A waiting update is cleared once its version runs, so the notification stops
+- Updates.Restart: restart into an installed update under the same authorization as the install; the updates action is now kept by polkit
 - foundation_installer's D-Bus backend moved to foundation.gbackend (shared with the updater)
 * Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-1
 - Slots are dm-verity pairs (root and hash partition) with fixed labels, named by the root hash; one update archive format
