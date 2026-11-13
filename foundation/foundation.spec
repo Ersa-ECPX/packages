@@ -1,6 +1,6 @@
 Name:           foundation
 Version:        0.6.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Ersa Compute Platform management command line
 License:        LicenseRef-Unknown
 BuildArch:      noarch
@@ -64,6 +64,20 @@ Requires:       typelib-1_0-Gtk-4_0
 Requires:       typelib-1_0-Adw-1
 Requires:       foundation = %{version}-%{release}
 
+%package -n foundation-updater
+Summary:        Ersa Compute Platform system update window
+Requires:       python3 >= 3.9
+Requires:       python3-gobject
+Requires:       typelib-1_0-Gtk-4_0
+Requires:       typelib-1_0-Adw-1
+Requires:       foundation = %{version}-%{release}
+Requires:       polkit
+
+%description -n foundation-updater
+A window for updating the Ersa Compute Platform: check for an update at the configured update source, install it into the
+spare slot, and restart into it, or install an update file by hand. It is a client of foundationd (the Updates interface)
+and holds no policy of its own; foundationd asks polkit for the administrator's password before it installs anything.
+
 %description -n foundation-installer
 A window for installing the Ersa Compute Platform on a disk: choose the disk, review
 what will be erased, install with a progress bar. It is a client of foundationd (the Deploy
@@ -93,6 +107,12 @@ install -pm0644 foundationd/*.py %{buildroot}/usr/lib/foundation/foundationd/
 install -pm0644 foundationd/api/*.py %{buildroot}/usr/lib/foundation/foundationd/api/
 install -pm0644 foundationd/backends/*.py %{buildroot}/usr/lib/foundation/foundationd/backends/
 install -pm0644 foundationd/workers/*.py %{buildroot}/usr/lib/foundation/foundationd/workers/
+install -d %{buildroot}/usr/lib/foundation/foundation_updater
+install -pm0644 foundation_updater/*.py %{buildroot}/usr/lib/foundation/foundation_updater/
+install -pm0644 foundation_updater/*.svg %{buildroot}/usr/lib/foundation/foundation_updater/
+install -Dpm0755 bin/ersa-updater %{buildroot}%{_bindir}/ersa-updater
+install -Dpm0644 data/applications/org.ersa.Updater.desktop %{buildroot}/usr/share/applications/org.ersa.Updater.desktop
+install -Dpm0644 data/icons/org.ersa.Updater.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/org.ersa.Updater.svg
 install -d %{buildroot}/usr/lib/foundation/foundation_installer
 install -pm0644 foundation_installer/*.py %{buildroot}/usr/lib/foundation/foundation_installer/
 install -pm0644 foundation_installer/*.svg %{buildroot}/usr/lib/foundation/foundation_installer/
@@ -137,6 +157,12 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/foundation/
 %doc /usr/share/doc/foundation/README.md
 
+%files -n foundation-updater
+%{_bindir}/ersa-updater
+/usr/lib/foundation/foundation_updater/
+/usr/share/applications/org.ersa.Updater.desktop
+/usr/share/icons/hicolor/scalable/apps/org.ersa.Updater.svg
+
 %files -n foundation-installer
 %{_bindir}/ersa-installer
 /usr/lib/foundation/foundation_installer/
@@ -173,6 +199,12 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/user/foundation-splash-sync.service
 
 %changelog
+* Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-2
+- Add the foundation-updater subpackage: a window with Check for Updates / Update (reads the feed at ota.url) and
+  Install from a File in its menu; asks polkit through foundationd before installing
+- Slots are named a and b; the version they hold is a separate field (GetSlots version, GetBootState running_version)
+- A waiting update is cleared once its version runs, so the notification stops
+- foundation_installer's D-Bus backend moved to foundation.gbackend (shared with the updater)
 * Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-1
 - Slots are dm-verity pairs (root and hash partition) with fixed labels, named by the root hash; one update archive format
   carrying the hash tree; kernel images are installed unchanged (signed for Secure Boot); `slot copy` removed
