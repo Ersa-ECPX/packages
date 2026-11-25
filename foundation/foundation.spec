@@ -1,6 +1,6 @@
 Name:           foundation
 Version:        0.6.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Ersa Compute Platform management command line
 License:        LicenseRef-Unknown
 BuildArch:      noarch
@@ -64,8 +64,10 @@ Requires:       typelib-1_0-Gtk-4_0
 Requires:       typelib-1_0-Adw-1
 Requires:       foundation = %{version}-%{release}
 
-%package -n foundation-updater
-Summary:        Ersa Compute Platform system update window
+%package -n foundation-deck
+Obsoletes:      foundation-updater < %{version}-%{release}
+Provides:       foundation-updater = %{version}-%{release}
+Summary:        Ersa Compute Platform management window (Deck)
 Requires:       python3 >= 3.9
 Requires:       python3-gobject
 Requires:       typelib-1_0-Gtk-4_0
@@ -73,10 +75,10 @@ Requires:       typelib-1_0-Adw-1
 Requires:       foundation = %{version}-%{release}
 Requires:       polkit
 
-%description -n foundation-updater
-A window for updating the Ersa Compute Platform: check for an update at the configured update source, install it into the
-spare slot, and restart into it, or install an update file by hand. It is a client of foundationd (the Updates interface)
-and holds no policy of its own; foundationd asks polkit for the administrator's password before it installs anything.
+
+%description -n foundation-deck
+Deck: a window for managing the Ersa Compute Platform: the running version and boot slots, system updates, and bundles and
+extensions. It is a client of foundationd and holds no policy of its own; foundationd asks polkit before it changes anything.
 
 %description -n foundation-installer
 A window for installing the Ersa Compute Platform on a disk: choose the disk, review
@@ -107,12 +109,14 @@ install -pm0644 foundationd/*.py %{buildroot}/usr/lib/foundation/foundationd/
 install -pm0644 foundationd/api/*.py %{buildroot}/usr/lib/foundation/foundationd/api/
 install -pm0644 foundationd/backends/*.py %{buildroot}/usr/lib/foundation/foundationd/backends/
 install -pm0644 foundationd/workers/*.py %{buildroot}/usr/lib/foundation/foundationd/workers/
-install -d %{buildroot}/usr/lib/foundation/foundation_updater
-install -pm0644 foundation_updater/*.py %{buildroot}/usr/lib/foundation/foundation_updater/
-install -pm0644 foundation_updater/*.svg %{buildroot}/usr/lib/foundation/foundation_updater/
-install -Dpm0755 bin/ersa-updater %{buildroot}%{_bindir}/ersa-updater
-install -Dpm0644 data/applications/org.ersa.Updater.desktop %{buildroot}/usr/share/applications/org.ersa.Updater.desktop
-install -Dpm0644 data/icons/org.ersa.Updater.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/org.ersa.Updater.svg
+install -d %{buildroot}/usr/lib/foundation/foundation_deck
+install -pm0644 foundation_deck/*.py %{buildroot}/usr/lib/foundation/foundation_deck/
+install -pm0644 foundation_deck/*.svg %{buildroot}/usr/lib/foundation/foundation_deck/
+install -d %{buildroot}/usr/lib/foundation/foundation_deck/symbolic
+install -pm0644 foundation_deck/symbolic/*.svg %{buildroot}/usr/lib/foundation/foundation_deck/symbolic/
+install -Dpm0755 bin/ersa-deck %{buildroot}%{_bindir}/ersa-deck
+install -Dpm0644 data/applications/org.ersa.Deck.desktop %{buildroot}/usr/share/applications/org.ersa.Deck.desktop
+install -Dpm0644 data/icons/org.ersa.Deck.svg %{buildroot}/usr/share/icons/hicolor/scalable/apps/org.ersa.Deck.svg
 install -d %{buildroot}/usr/lib/foundation/foundation_installer
 install -pm0644 foundation_installer/*.py %{buildroot}/usr/lib/foundation/foundation_installer/
 install -pm0644 foundation_installer/*.svg %{buildroot}/usr/lib/foundation/foundation_installer/
@@ -126,6 +130,8 @@ install -Dpm0755 data/libexec/foundationd-worker %{buildroot}/usr/libexec/founda
 install -Dpm0755 data/libexec/foundation-bundles %{buildroot}/usr/libexec/foundation-bundles
 install -Dpm0755 data/libexec/foundation-update-notify %{buildroot}/usr/libexec/foundation-update-notify
 install -Dpm0755 data/libexec/foundation-autoupdate %{buildroot}/usr/libexec/foundation-autoupdate
+install -Dpm0755 data/libexec/foundation-default-apps %{buildroot}/usr/libexec/foundation-default-apps
+install -Dpm0644 data/systemd/foundation-default-apps.service %{buildroot}/usr/lib/systemd/system/foundation-default-apps.service
 install -Dpm0644 data/systemd/foundation-autoupdate.service %{buildroot}/usr/lib/systemd/system/foundation-autoupdate.service
 install -Dpm0644 data/systemd/foundation-autoupdate.timer %{buildroot}/usr/lib/systemd/system/foundation-autoupdate.timer
 install -Dpm0755 data/libexec/foundation-splash-sync %{buildroot}/usr/libexec/foundation-splash-sync
@@ -160,11 +166,11 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/foundation/
 %doc /usr/share/doc/foundation/README.md
 
-%files -n foundation-updater
-%{_bindir}/ersa-updater
-/usr/lib/foundation/foundation_updater/
-/usr/share/applications/org.ersa.Updater.desktop
-/usr/share/icons/hicolor/scalable/apps/org.ersa.Updater.svg
+%files -n foundation-deck
+%{_bindir}/ersa-deck
+/usr/lib/foundation/foundation_deck/
+/usr/share/applications/org.ersa.Deck.desktop
+/usr/share/icons/hicolor/scalable/apps/org.ersa.Deck.svg
 
 %files -n foundation-installer
 %{_bindir}/ersa-installer
@@ -197,6 +203,8 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/libexec/foundation-bundles
 /usr/libexec/foundation-update-notify
 /usr/libexec/foundation-autoupdate
+/usr/libexec/foundation-default-apps
+/usr/lib/systemd/system/foundation-default-apps.service
 /usr/lib/systemd/system/foundation-autoupdate.service
 /usr/lib/systemd/system/foundation-autoupdate.timer
 /usr/lib/systemd/user/foundation-update-notify.service
@@ -205,6 +213,10 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/user/foundation-splash-sync.service
 
 %changelog
+* Wed Nov 25 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-3
+- Add the foundation-deck subpackage (Deck), which replaces foundation-updater (removed): updates, slots, bundles, repositories,
+  remote access and more in one window
+
 * Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-2
 - Add the foundation-updater subpackage: a window with Check for Updates / Update (reads the feed at ota.url) and
   Install from a File in its menu; asks polkit through foundationd before installing
@@ -215,7 +227,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
   and the command line are clients of it. New setting ota.auto_update (replaces ota.auto_download, which nothing used)
 - foundation-autoupdate.timer: about ten minutes after start and every six hours it checks, and installs only if ota.auto_update is on; a
   desktop notification announces an update that is available. foundationd authorizes root without polkit (the service runs as root)
-- foundation_installer's D-Bus backend moved to foundation.gbackend (shared with the updater)
+- foundation_installer's D-Bus backend moved to foundation.gbackend (shared with Deck)
 * Fri Nov 13 2026 Ersa Compute Platform <ecp@ersa.local> - 0.6.0-1
 - Slots are dm-verity pairs (root and hash partition) with fixed labels, named by the root hash; one update archive format
   carrying the hash tree; kernel images are installed unchanged (signed for Secure Boot); `slot copy` removed

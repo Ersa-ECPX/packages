@@ -13,29 +13,19 @@ repository implement.
   `ecp-mkosi` plus the `foundation` README, by `ecp-mkosi/scripts/build-wiki`). `/wiki/api/` is Doxygen over the sources of
   `ersa-bluetooth` and the Dialer at the commits their specs pin (`docs/doxygen/Doxyfile`). Both come from the public
   repositories as they are when a release is published, so a release always carries current documentation.
-- **GitHub builds the RPMs, in a container.** The build runs in an openSUSE Tumbleweed container (`scripts/build-repo-podman`)
-  and takes its packages from openSUSE's own build servers (`OPENSUSE_MIRROR`), not from the download.opensuse.org
-  redirector. An earlier attempt used the redirector, which sent the runner to a mirror that was mid-sync, and failed every time.
+- **The RPMs are built by hand, in a container** (`scripts/build-repo-podman`, openSUSE Tumbleweed), because the CI build never worked:
+  the first runs failed on mirror problems and it was removed. The container takes its packages from openSUSE's own build servers
+  (`OPENSUSE_MIRROR`), not from the download.opensuse.org redirector, which once sent a build to a mirror that was mid-sync.
 
 ## To publish
-
-```
-git tag r20261112 && git push origin r20261112
-```
-
-That is all: `.github/workflows/build-rpms.yml` builds every package, creates the release with the RPMs attached and runs the
-publishing workflow. It can also be started by hand from the Actions tab (give it the tag to create).
-
-Before tagging, anything a spec downloads must exist. The `foundation` spec builds the tag `v<Version>` of the `foundation`
-repository, so tag that first and bump `Version:` here; `ersa-bluetooth` and `ersa-dialer` build the commit pinned in their
-`%global commit`.
-
-To build on your own machine instead (for a look before tagging, or without GitHub):
 
 ```
 scripts/build-repo-podman repo                 # every package in a container
 scripts/release-rpms r20261112 repo --draft    # create a draft release with the RPMs; publishing it runs the publishing workflow
 ```
+
+Before that, anything a spec downloads must exist. The `foundation` spec builds the tag `v<Version>` of the `foundation` repository, so
+tag that first and bump `Version:` here; `ersa-bluetooth` and `ersa-dialer` build the commit pinned in their `%global commit`.
 
 ## One-time setup
 
@@ -55,7 +45,6 @@ scripts/release-rpms r20261112 repo --draft    # create a draft release with the
 | `scripts/release-rpms` | creates a release with the RPMs |
 | `scripts/make-signing-key` | makes the signing key |
 | `docs/doxygen/Doxyfile` | the C++ API reference |
-| `.github/workflows/build-rpms.yml` | builds, makes the release and publishes, on a tag |
 | `.github/workflows/pages.yml` | signs and publishes the site for a release |
 
 ## Limits

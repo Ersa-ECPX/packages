@@ -40,14 +40,14 @@ Releasing a new `foundation`: tag `v<Version>` in the `foundation` repository, b
 The packages are published at **https://pkgs-compute.ersa.dev** (GitHub Pages): a page for each package, the current signed RPM
 repository, the platform wiki at `/wiki/` and the C++ API reference at `/wiki/api/` (the same layout as pkgs-wearables.ersa.dev).
 Each upload is also kept as a GitHub release with its files, so every older version stays downloadable and the package pages
-link them. GitHub builds the packages, in a Tumbleweed container (`.github/workflows/build-rpms.yml`):
+link them. The packages are built by hand in a Tumbleweed container (the CI build never worked and was removed):
 
 ```sh
-git tag r20261112 && git push origin r20261112     # builds, makes the release, signs and publishes
+scripts/build-repo-podman repo                       # every package, in a container
+scripts/release-rpms r20261112 repo --draft          # a release with the RPMs; publishing it signs and publishes the site
 ```
 
-Before tagging, whatever a spec downloads must exist (`foundation` builds the tag `v<Version>` of the `foundation` repository). To
-build on your own machine instead: `scripts/build-repo-podman repo`, then `scripts/release-rpms r20261112 repo --draft`.
+Before that, whatever a spec downloads must exist (`foundation` builds the tag `v<Version>` of the `foundation` repository).
 
 The setup (Pages source, DNS, the signing key from `scripts/make-signing-key`) and the limits are in
 [docs/publishing.md](docs/publishing.md); `scripts/build-site OUTPUT` builds the same site locally (`--rpms DIR` to include a
