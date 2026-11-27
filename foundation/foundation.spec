@@ -97,9 +97,11 @@ packages, system extensions and settings.
 %build
 
 %check
+python3 tools/i18n.py check
 python3 -m unittest discover -s tests
 
 %install
+python3 tools/i18n.py compile --out %{buildroot}%{_datadir}/locale
 install -Dpm0755 bin/foundation %{buildroot}%{_bindir}/foundation
 install -d %{buildroot}/usr/lib/foundation/foundation
 install -pm0644 foundation/*.py %{buildroot}/usr/lib/foundation/foundation/
@@ -169,6 +171,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 %doc /usr/share/doc/foundation/README.md
 
 %files -n foundation-deck
+%{_datadir}/locale/*/LC_MESSAGES/ersa-deck.mo
 %{_bindir}/ersa-deck
 /usr/lib/foundation/foundation_deck/
 /usr/share/applications/org.ersa.Deck.desktop
@@ -177,6 +180,7 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/systemd/user/foundation-ersa-id-offer.path
 
 %files -n foundation-installer
+%{_datadir}/locale/*/LC_MESSAGES/ersa-installer.mo
 %{_bindir}/ersa-installer
 /usr/lib/foundation/foundation_installer/
 /usr/share/applications/org.ersa.Installer.desktop
