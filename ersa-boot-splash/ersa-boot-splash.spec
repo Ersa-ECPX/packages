@@ -1,6 +1,6 @@
 Name:           ersa-boot-splash
 Version:        0.1.0
-Release:        4
+Release:        5
 Summary:        Ersa Plymouth boot theme
 License:        LicenseRef-Unknown
 BuildArch:      noarch
@@ -62,6 +62,9 @@ install -Dpm0644 %{SOURCE12} %{buildroot}%{_datadir}/plymouth/themes/ersa-dark/t
 %{_datadir}/plymouth/themes/ersa-dark/track-dark.png
 
 %changelog
+* Fri Nov 27 2026 Ersa Compute Platform <ecp@ersa.local> - 0.1.0-5
+- Show the unlock prompt (passphrase, recovery key) of an encrypted disk, in both themes
+
 * Sat Nov 07 2026 Ersa Compute Platform <ecp@ersa.local> - 0.1.0-4
 - Add the ersa-dark theme (dark background, light logo), selected with plymouth.splash=ersa-dark
 

@@ -66,3 +66,46 @@ fun hide_message(text) {
 
 Plymouth.SetDisplayMessageFunction(show_message);
 Plymouth.SetHideMessageFunction(hide_message);
+
+# Asking for a secret during boot: the passphrase or recovery key of an encrypted disk (systemd's unlock prompt, answered by typing).
+# The progress bar and status text step aside while the question is shown, and come back when the boot goes on.
+prompt_sprite = Sprite();
+bullet_sprite = Sprite();
+prompt_y = track_y + 28 * ui_scale;
+
+fun show_prompt(prompt, bullets) {
+    track_sprite.SetOpacity(0);
+    fill_sprite.SetOpacity(0);
+    message_sprite.SetOpacity(0);
+    prompt_image = Image.Text(prompt, text_r, text_g, text_b, 1, font_name, "center");
+    prompt_sprite.SetImage(prompt_image);
+    prompt_sprite.SetPosition(Window.GetWidth() / 2 - prompt_image.GetWidth() / 2, prompt_y, 20);
+    prompt_sprite.SetOpacity(1);
+    dots = " ";
+    for (i = 0; i < bullets; i++) {
+        dots = dots + "*";
+    }
+    bullet_image = Image.Text(dots, text_r, text_g, text_b, 1, font_name, "center");
+    bullet_sprite.SetImage(bullet_image);
+    bullet_sprite.SetPosition(Window.GetWidth() / 2 - bullet_image.GetWidth() / 2,
+                              prompt_y + prompt_image.GetHeight() + 14 * ui_scale, 20);
+    bullet_sprite.SetOpacity(1);
+}
+
+fun show_question(prompt, entry) {
+    show_prompt(prompt, 0);
+    entry_image = Image.Text(entry + "_", text_r, text_g, text_b, 1, font_name, "center");
+    bullet_sprite.SetImage(entry_image);
+    bullet_sprite.SetPosition(Window.GetWidth() / 2 - entry_image.GetWidth() / 2,
+                              prompt_y + 40 * ui_scale, 20);
+}
+
+fun back_to_boot() {
+    prompt_sprite.SetOpacity(0);
+    bullet_sprite.SetOpacity(0);
+    track_sprite.SetOpacity(1);
+}
+
+Plymouth.SetDisplayPasswordFunction(show_prompt);
+Plymouth.SetDisplayQuestionFunction(show_question);
+Plymouth.SetDisplayNormalFunction(back_to_boot);
