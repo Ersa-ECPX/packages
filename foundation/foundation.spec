@@ -147,6 +147,8 @@ install -Dpm0644 data/polkit/org.ersa.foundation.policy %{buildroot}/usr/share/p
 install -Dpm0644 data/systemd/foundationd.service %{buildroot}/usr/lib/systemd/system/foundationd.service
 install -Dpm0644 data/systemd-user/foundation-provisioning.service %{buildroot}/usr/lib/systemd/user/foundation-provisioning.service
 install -Dpm0644 data/systemd-user/foundation-provisioning.path %{buildroot}/usr/lib/systemd/user/foundation-provisioning.path
+install -Dpm0644 data/systemd-user/foundation-ersa-id-offer.service %{buildroot}/usr/lib/systemd/user/foundation-ersa-id-offer.service
+install -Dpm0644 data/systemd-user/foundation-ersa-id-offer.path %{buildroot}/usr/lib/systemd/user/foundation-ersa-id-offer.path
 install -Dpm0644 data/config/schema.d/10-foundation.json %{buildroot}/usr/lib/foundation/schema.d/10-foundation.json
 install -d %{buildroot}/usr/lib/foundation/defaults.d
 install -Dpm0644 data/repos.d/opensuse-oss.repo %{buildroot}/usr/lib/foundation/repos.d/opensuse-oss.repo
@@ -171,6 +173,8 @@ install -Dpm0644 README.md %{buildroot}/usr/share/doc/foundation/README.md
 /usr/lib/foundation/foundation_deck/
 /usr/share/applications/org.ersa.Deck.desktop
 /usr/share/icons/hicolor/scalable/apps/org.ersa.Deck.svg
+/usr/lib/systemd/user/foundation-ersa-id-offer.service
+/usr/lib/systemd/user/foundation-ersa-id-offer.path
 
 %files -n foundation-installer
 %{_bindir}/ersa-installer
