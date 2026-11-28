@@ -39,6 +39,7 @@ Requires:       python3 >= 3.9
 Requires:       python3-gobject
 Requires:       polkit
 Requires:       python3-solv
+Requires:       python3-cryptography
 Requires:       gpg2
 Requires:       zstd
 Requires:       dbus-1
